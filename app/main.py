@@ -32,6 +32,7 @@ def main():
                         break
                 if not found:
                     print(f"{args[0]}: not found")
+                        "pwd": lambda userInput: print(os.getcwd()),
         else:
             path_env = os.environ.get("PATH", "")
             found = False
