@@ -1,6 +1,8 @@
 import sys
 
 commands = {
+    "echo": lambda userInput: print(userInput[5:]),
+    "exit": lambda userInput: sys.exit(0),
     "type": lambda userInput: print(f"{args} is a shell builtin")
     if (args := userInput[5:]) in commands
     else print(f"{args}: not found"),
