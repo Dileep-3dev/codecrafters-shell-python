@@ -1,5 +1,5 @@
 import sys
-
+import os
 def main():
     # TODO: Uncomment the code below to pass the first stage
     # sys.stdout.write("$ ")
@@ -16,7 +16,16 @@ def main():
             if args in ["echo", "exit", "type"]:
                 print(f"{args} is a shell builtin")
             else:
-                print(f"{args}: not found")
+                path_env = os.environ.get("PATH", "")
+                found = False
+                for directory in path_env.split(os.pathsep):
+                    full_path = os.path.join(directory, args)
+                    if os.path.exists(full_path) and os.access(full_path, os.X_OK):
+                        print(f"{args} is {full_path}")
+                        found = True
+                        break
+                if not found:
+                    print(f"{args}: not found")
         else:
             print(f"{command}: command not found")
 
