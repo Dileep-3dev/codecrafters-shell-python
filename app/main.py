@@ -1,6 +1,10 @@
 import sys
 
-
+commands = {
+    "type": lambda userInput: print(f"{args} is a shell builtin")
+    if (args := userInput[5:]) in commands
+    else print(f"{args}: not found"),
+}
 def main():
     # TODO: Uncomment the code below to pass the first stage
     # sys.stdout.write("$ ")
