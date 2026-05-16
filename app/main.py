@@ -1,18 +1,11 @@
 import sys
 import os
 import subprocess
+import shutil
 
 
 def locate_in_path(command):
-    path_env = os.environ.get("PATH", "")
-
-    for directory in path_env.split(os.pathsep):
-        full_path = os.path.join(directory, command)
-
-        if os.path.exists(full_path) and os.access(full_path, os.X_OK):
-            return full_path
-
-    return None
+    return shutil.which(command)
 
 
 def main():
@@ -43,12 +36,27 @@ def main():
         elif program == "pwd":
             print(os.getcwd())
 
+        # cd
+        elif program == "cd":
+            if not args:
+                continue
+
+            path = args[0]
+
+            if path == "~":
+                path = os.path.expanduser("~")
+
+            if os.path.exists(path):
+                os.chdir(path)
+            else:
+                sys.stderr.write(f"cd: {args[0]}: No such file or directory\n")
+
         # type
         elif program == "type":
             if not args:
                 continue
 
-            builtins = ["echo", "exit", "type", "pwd"]
+            builtins = ["echo", "exit", "type", "pwd", "cd"]
 
             if args[0] in builtins:
                 print(f"{args[0]} is a shell builtin")
@@ -66,9 +74,20 @@ def main():
             executable = locate_in_path(program)
 
             if executable:
-                subprocess.run([program] + args)
+                result = subprocess.run(
+                    [program] + args,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True
+                )
+
+                sys.stdout.write(result.stdout)
+
+                if result.stderr:
+                    sys.stderr.write(result.stderr)
+
             else:
-                print(f"{command}: command not found")
+                sys.stderr.write(f"{program}: command not found\n")
 
 
 if __name__ == "__main__":
