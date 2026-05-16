@@ -6,26 +6,31 @@ def main():
     while True:
         sys.stdout.write("$ ")
         # Wait for user input
+        sys.stdout.flush()
         command = input()
-        if command == "exit":
+        parts = command.split()
+        if not parts:
+            continue
+        program = parts[0]
+        args = parts[1:]
+        if program == "exit":
             break
-        elif command.startswith("echo "):
-            print(command[5:])
-        elif command.startswith("type "):
-            args = command[5:]
-            if args in ["echo", "exit", "type"]:
-                print(f"{args} is a shell builtin")
+        elif program == "echo":
+            print(" ".join(args))
+        elif program == "type":
+            if args and args[0] in ["echo", "exit", "type"]:
+                print(f"{args[0]} is a shell builtin")
             else:
                 path_env = os.environ.get("PATH", "")
                 found = False
                 for directory in path_env.split(os.pathsep):
-                    full_path = os.path.join(directory, args)
+                    full_path = os.path.join(directory, args[0])
                     if os.path.exists(full_path) and os.access(full_path, os.X_OK):
-                        print(f"{args} is {full_path}")
+                        print(f"{args[0]} is {full_path}")
                         found = True
                         break
                 if not found:
-                    print(f"{args}: not found")
+                    print(f"{args[0]}: not found")
         else:
             print(f"{command}: command not found")
 
