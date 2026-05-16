@@ -13,6 +13,7 @@ def locate_in_path(command):
 
 
 def main():
+
     while True:
 
         sys.stdout.write("$ ")
@@ -23,7 +24,11 @@ def main():
         if not command:
             continue
 
-        # IMPORTANT: handles quotes properly
+        # output redirection support
+        if ">" in command or "1>" in command:
+            os.system(command)
+            continue
+
         parts = shlex.split(command)
 
         program = parts[0]
@@ -48,16 +53,12 @@ def main():
         # cd
         elif program == "cd":
 
-            # cd -> home directory
+            # cd -> home
             if not args:
                 os.chdir(os.path.expanduser("~"))
                 continue
 
-            path = args[0]
-
-            # handle "~"
-            if path == "~":
-                path = os.path.expanduser("~")
+            path = os.path.expanduser(args[0])
 
             try:
                 os.chdir(path)
@@ -77,6 +78,7 @@ def main():
                 print(f"{command_type} is a shell builtin")
 
             else:
+
                 executable = locate_in_path(command_type)
 
                 if executable:
