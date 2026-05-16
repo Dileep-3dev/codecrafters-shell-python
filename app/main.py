@@ -1,5 +1,6 @@
 import sys
 import os
+import subprocess
 def main():
     # TODO: Uncomment the code below to pass the first stage
     # sys.stdout.write("$ ")
@@ -32,7 +33,16 @@ def main():
                 if not found:
                     print(f"{args[0]}: not found")
         else:
-            print(f"{command}: command not found")
+            path_env = os.environ.get("PATH", "")
+            found = False
+            for directory in path_env.split(os.pathsep):
+                full_path = os.path.join(directory, program)
+                if os.path.exists(full_path) and os.access(full_path, os.X_OK):
+                    subprocess.run([program] + args)
+                    found = True
+                    break
+            if not found:
+                print(f"{command}: command not found")
 
 
 if __name__ == "__main__":
