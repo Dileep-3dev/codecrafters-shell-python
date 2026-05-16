@@ -2,6 +2,10 @@ import sys
 import os
 import subprocess
 import shutil
+import shlex
+
+
+builtins = ["echo", "exit", "type", "pwd", "cd"]
 
 
 def locate_in_path(command):
@@ -10,22 +14,27 @@ def locate_in_path(command):
 
 def main():
     while True:
+
         sys.stdout.write("$ ")
         sys.stdout.flush()
 
-        command = input()
-        parts = command.split()
+        command = input().strip()
 
-        if not parts:
+        if not command:
             continue
+
+        # IMPORTANT: handles quotes properly
+        parts = shlex.split(command)
 
         program = parts[0]
         args = parts[1:]
 
         # exit
         if program == "exit":
+
             if args and args[0] == "0":
                 sys.exit(0)
+
             break
 
         # echo
@@ -38,56 +47,59 @@ def main():
 
         # cd
         elif program == "cd":
+
+            # cd -> home directory
             if not args:
+                os.chdir(os.path.expanduser("~"))
                 continue
 
             path = args[0]
 
+            # handle "~"
             if path == "~":
                 path = os.path.expanduser("~")
 
-            if os.path.exists(path):
+            try:
                 os.chdir(path)
-            else:
-                sys.stderr.write(f"cd: {args[0]}: No such file or directory\n")
+
+            except FileNotFoundError:
+                print(f"cd: {args[0]}: No such file or directory")
 
         # type
         elif program == "type":
+
             if not args:
                 continue
 
-            builtins = ["echo", "exit", "type", "pwd", "cd"]
+            command_type = args[0]
 
-            if args[0] in builtins:
-                print(f"{args[0]} is a shell builtin")
+            if command_type in builtins:
+                print(f"{command_type} is a shell builtin")
 
             else:
-                executable = locate_in_path(args[0])
+                executable = locate_in_path(command_type)
 
                 if executable:
-                    print(f"{args[0]} is {executable}")
+                    print(f"{command_type} is {executable}")
+
                 else:
-                    print(f"{args[0]}: not found")
+                    print(f"{command_type}: not found")
 
         # external commands
         else:
+
             executable = locate_in_path(program)
 
             if executable:
-                result = subprocess.run(
-                    [program] + args,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.PIPE,
-                    text=True
-                )
 
-                sys.stdout.write(result.stdout)
+                try:
+                    subprocess.run([program] + args)
 
-                if result.stderr:
-                    sys.stderr.write(result.stderr)
+                except FileNotFoundError:
+                    print(f"{program}: command not found")
 
             else:
-                sys.stderr.write(f"{program}: command not found\n")
+                print(f"{program}: command not found")
 
 
 if __name__ == "__main__":
