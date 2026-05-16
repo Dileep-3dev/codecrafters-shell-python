@@ -1,12 +1,5 @@
 import sys
 
-commands = {
-    "echo": lambda command: print(command[5:]),
-    "exit": lambda commnad: sys.exit(0),
-    "type": lambda commnad: print(f"{args} is a shell builtin")
-    if (args := commnad[5:]) in commands
-    else print(f"{args}: not found"),
-}
 def main():
     # TODO: Uncomment the code below to pass the first stage
     # sys.stdout.write("$ ")
@@ -18,6 +11,12 @@ def main():
             break
         elif command.startswith("echo "):
             print(command[5:])
+        elif command.startswith("type "):
+            args = command[5:]
+            if args in ["echo", "exit", "type"]:
+                print(f"{args} is a shell builtin")
+            else:
+                print(f"{args}: not found")
         else:
             print(f"{command}: command not found")
 
