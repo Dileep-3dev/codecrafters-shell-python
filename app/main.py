@@ -26,18 +26,27 @@ def locate_in_path(command):
 # autocomplete
 def complete(text, state):
 
-    line = readline.get_line_buffer()
-
-    # current token being completed
-    if line.endswith(" "):
-        current = ""
-    else:
-        current = line.split()[-1] if line.split() else ""
-
     matches = []
 
+    def format_match(path):
+
+        if os.path.isdir(path):
+            return path + "/"
+
+        return path + " "
+
+    buffer = readline.get_line_buffer()
+
+    completing_command = (
+        not buffer.strip()
+        or (
+            not buffer.endswith(" ")
+            and len(buffer.split()) == 1
+        )
+    )
+
     # command completion
-    if len(line.split()) <= 1 and not line.endswith(" "):
+    if completing_command:
 
         commands = set(builtins)
 
@@ -49,72 +58,68 @@ def complete(text, state):
                 continue
 
             try:
-                for file in os.listdir(directory):
+                for entry in os.listdir(directory):
 
-                    full_path = os.path.join(directory, file)
+                    full_path = os.path.join(directory, entry)
 
                     if (
-                        os.path.isfile(full_path)
+                        entry.startswith(text)
+                        and os.path.isfile(full_path)
                         and os.access(full_path, os.X_OK)
                     ):
-                        commands.add(file)
+                        commands.add(entry)
 
             except:
                 pass
 
-        matches = sorted(
-            [cmd for cmd in commands if cmd.startswith(current)]
-        )
+        for cmd in commands:
 
-    # file completion
-    else:
+            if cmd.startswith(text):
+                matches.append(cmd + " ")
 
-        directory = "."
-        prefix = current
+    # filepath completion
+    try:
 
-        if "/" in current:
+        if "/" in text:
 
-            directory, prefix = os.path.split(current)
+            dirpath, prefix = os.path.split(text)
 
-            if directory == "":
-                directory = "."
+            if dirpath == "":
+                dirpath = "."
 
-        try:
+            for entry in os.listdir(dirpath):
 
-            entries = os.listdir(directory)
+                if entry.startswith(prefix):
 
-            for item in entries:
+                    full_match = os.path.join(dirpath, entry)
 
-                if item.startswith(prefix):
+                    if full_match.startswith("./"):
+                        full_match = full_match[2:]
 
-                    full_path = os.path.join(directory, item)
+                    matches.append(format_match(full_match))
 
-                    if directory == ".":
-                        candidate = item
-                    else:
-                        candidate = f"{directory}/{item}"
+        else:
 
-                    matches.append(candidate)
+            for entry in os.listdir("."):
 
-            matches.sort()
+                if entry.startswith(text):
+                    matches.append(format_match(entry))
 
-        except:
-            matches = []
+    except FileNotFoundError:
+        pass
 
-    if state >= len(matches):
+    matches = sorted(set(matches))
+
+    if not matches:
         return None
 
-    match = matches[state]
+    if state < len(matches):
+        return matches[state]
 
-    # directory
-    if os.path.isdir(match):
-        return match + "/"
-
-    # file
-    return match + " "
+    return None
 
 
-# display autocomplete matches
+# display matches
 def display_matches(substitution, matches, longest_match_length):
 
     print()
@@ -207,7 +212,7 @@ def execute_external(program, args):
 
         return
 
-    # with redirect
+    # redirect exists
     stream, mode, op_index, filepath = redirect
 
     ensure_parent_directory(filepath)
@@ -246,27 +251,25 @@ def main():
 
     readline.set_completer(complete)
 
-    # allow '-' and '/' in completion
-    delims = readline.get_completer_delims()
-
-    for ch in "-/":
-        delims = delims.replace(ch, "")
-
-    readline.set_completer_delims(delims)
+    readline.set_completer_delims(" \t\n")
 
     readline.parse_and_bind("tab: complete")
-    readline.set_completion_display_matches_hook(display_matches)
+
+    readline.set_completion_display_matches_hook(
+        display_matches
+    )
 
     while True:
 
-        sys.stdout.write("$ ")
-        sys.stdout.flush()
-
         try:
-            command = input()
+            command = input("$ ")
 
         except EOFError:
             break
+
+        except KeyboardInterrupt:
+            print()
+            continue
 
         if not command.strip():
             continue
@@ -284,6 +287,7 @@ def main():
         args = parts[1:]
 
         redirect = parse_redirect(args)
+
         actual_args = clean_args(args)
 
         # exit
@@ -320,7 +324,7 @@ def main():
             try:
                 os.chdir(path)
 
-            except FileNotFoundError:
+            except OSError:
                 sys.stderr.write(
                     f"cd: {actual_args[0]}: No such file or directory\n"
                 )
@@ -335,17 +339,23 @@ def main():
 
             if command_type in builtins:
 
-                output = f"{command_type} is a shell builtin\n"
+                output = (
+                    f"{command_type} is a shell builtin\n"
+                )
 
             else:
 
                 executable = locate_in_path(command_type)
 
                 if executable:
-                    output = f"{command_type} is {executable}\n"
+                    output = (
+                        f"{command_type} is {executable}\n"
+                    )
 
                 else:
-                    output = f"{command_type}: not found\n"
+                    output = (
+                        f"{command_type}: not found\n"
+                    )
 
             write_output(output, redirect)
 
