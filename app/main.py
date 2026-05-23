@@ -6,7 +6,14 @@ import shlex
 import readline
 
 
-builtins = ["echo", "exit", "type", "pwd", "cd"]
+builtins = [
+    "echo",
+    "exit",
+    "type",
+    "pwd",
+    "cd",
+    "complete",
+]
 
 
 REDIRECT_OPS = {
@@ -77,7 +84,7 @@ def complete(text, state):
             if cmd.startswith(text):
                 matches.append(cmd + " ")
 
-    # filepath completion
+    # file completion
     try:
 
         if "/" in text:
@@ -119,7 +126,7 @@ def complete(text, state):
     return None
 
 
-# display matches
+# display autocomplete matches
 def display_matches(substitution, matches, longest_match_length):
 
     print()
@@ -157,7 +164,7 @@ def clean_args(args):
     return args
 
 
-# create directories
+# create parent dirs
 def ensure_parent_directory(filepath):
 
     directory = os.path.dirname(filepath)
@@ -328,6 +335,11 @@ def main():
                 sys.stderr.write(
                     f"cd: {actual_args[0]}: No such file or directory\n"
                 )
+
+        # complete builtin
+        elif program == "complete":
+            output = "complete is a shell builtin\n"
+            write_output(output, redirect)
 
         # type
         elif program == "type":
