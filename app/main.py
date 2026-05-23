@@ -66,44 +66,45 @@ def complete(text, state):
         prefix = text
 
         if "/" in text:
+
             directory, prefix = os.path.split(text)
 
             if directory == "":
                 directory = "."
 
         try:
+
+            entries = os.listdir(directory)
+
             matches = []
 
-            for item in os.listdir(directory):
+            for item in entries:
 
                 if item.startswith(prefix):
 
-                    full_path = os.path.join(directory, item)
-
-                    # preserve relative path correctly
                     if directory == ".":
-                        matches.append(item)
+                        candidate = item
                     else:
-                        matches.append(f"{directory}/{item}")
+                        candidate = f"{directory}/{item}"
+
+                    matches.append(candidate)
 
             matches.sort()
 
         except:
             matches = []
 
-    if state < len(matches):
+    if state >= len(matches):
+        return None
 
-        match = matches[state]
+    match = matches[state]
 
-        # IMPORTANT FIX:
-        # add "/" for directories
-        if os.path.isdir(match):
-            return match + "/"
+    # append "/" for directories
+    if os.path.isdir(match):
+        return match + "/"
 
-        # add trailing space for files
-        return match + " "
-
-    return None
+    # append space for files
+    return match + " "
 
 
 # display autocomplete matches
@@ -144,7 +145,7 @@ def clean_args(args):
     return args
 
 
-# create parent dirs
+# create directories
 def ensure_parent_directory(filepath):
 
     directory = os.path.dirname(filepath)
@@ -153,7 +154,7 @@ def ensure_parent_directory(filepath):
         os.makedirs(directory, exist_ok=True)
 
 
-# write builtin output
+# builtin output handling
 def write_output(output, redirect):
 
     if redirect is None:
@@ -238,7 +239,7 @@ def main():
 
     readline.set_completer(complete)
 
-    # allow '-' in completion
+    # allow '-' in autocomplete
     delims = readline.get_completer_delims()
     readline.set_completer_delims(delims.replace("-", ""))
 
