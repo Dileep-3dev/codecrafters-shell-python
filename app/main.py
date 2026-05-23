@@ -59,40 +59,54 @@ def complete(text, state):
             [cmd for cmd in commands if cmd.startswith(text)]
         )
 
-    # file completion
+    # filepath completion
     else:
 
-        path = "."
+        directory = "."
         prefix = text
 
         if "/" in text:
+            directory, prefix = os.path.split(text)
 
-            path, prefix = os.path.split(text)
-
-            if path == "":
-                path = "."
+            if directory == "":
+                directory = "."
 
         try:
-            matches = sorted(
-                [
-                    os.path.join(path, f)
-                    if path != "."
-                    else f
-                    for f in os.listdir(path)
-                    if f.startswith(prefix)
-                ]
-            )
+            matches = []
+
+            for item in os.listdir(directory):
+
+                if item.startswith(prefix):
+
+                    full_path = os.path.join(directory, item)
+
+                    # preserve relative path correctly
+                    if directory == ".":
+                        matches.append(item)
+                    else:
+                        matches.append(f"{directory}/{item}")
+
+            matches.sort()
 
         except:
             matches = []
 
     if state < len(matches):
-        return matches[state] + " "
+
+        match = matches[state]
+
+        # IMPORTANT FIX:
+        # add "/" for directories
+        if os.path.isdir(match):
+            return match + "/"
+
+        # add trailing space for files
+        return match + " "
 
     return None
 
 
-# display matches
+# display autocomplete matches
 def display_matches(substitution, matches, longest_match_length):
 
     print()
@@ -224,7 +238,7 @@ def main():
 
     readline.set_completer(complete)
 
-    # important for filename completion
+    # allow '-' in completion
     delims = readline.get_completer_delims()
     readline.set_completer_delims(delims.replace("-", ""))
 
@@ -323,7 +337,7 @@ def main():
 
             write_output(output, redirect)
 
-        # external
+        # external commands
         else:
             execute_external(program, args)
 
