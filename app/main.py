@@ -27,10 +27,17 @@ def locate_in_path(command):
 def complete(text, state):
 
     line = readline.get_line_buffer()
-    words = line.split()
+
+    # current token being completed
+    if line.endswith(" "):
+        current = ""
+    else:
+        current = line.split()[-1] if line.split() else ""
+
+    matches = []
 
     # command completion
-    if len(words) <= 1:
+    if len(line.split()) <= 1 and not line.endswith(" "):
 
         commands = set(builtins)
 
@@ -56,18 +63,18 @@ def complete(text, state):
                 pass
 
         matches = sorted(
-            [cmd for cmd in commands if cmd.startswith(text)]
+            [cmd for cmd in commands if cmd.startswith(current)]
         )
 
-    # filepath completion
+    # file completion
     else:
 
         directory = "."
-        prefix = text
+        prefix = current
 
-        if "/" in text:
+        if "/" in current:
 
-            directory, prefix = os.path.split(text)
+            directory, prefix = os.path.split(current)
 
             if directory == "":
                 directory = "."
@@ -76,11 +83,11 @@ def complete(text, state):
 
             entries = os.listdir(directory)
 
-            matches = []
-
             for item in entries:
 
                 if item.startswith(prefix):
+
+                    full_path = os.path.join(directory, item)
 
                     if directory == ".":
                         candidate = item
@@ -99,11 +106,11 @@ def complete(text, state):
 
     match = matches[state]
 
-    # append "/" for directories
+    # directory
     if os.path.isdir(match):
         return match + "/"
 
-    # append space for files
+    # file
     return match + " "
 
 
@@ -154,7 +161,7 @@ def ensure_parent_directory(filepath):
         os.makedirs(directory, exist_ok=True)
 
 
-# builtin output handling
+# write builtin output
 def write_output(output, redirect):
 
     if redirect is None:
@@ -239,9 +246,13 @@ def main():
 
     readline.set_completer(complete)
 
-    # allow '-' in autocomplete
+    # allow '-' and '/' in completion
     delims = readline.get_completer_delims()
-    readline.set_completer_delims(delims.replace("-", ""))
+
+    for ch in "-/":
+        delims = delims.replace(ch, "")
+
+    readline.set_completer_delims(delims)
 
     readline.parse_and_bind("tab: complete")
     readline.set_completion_display_matches_hook(display_matches)
