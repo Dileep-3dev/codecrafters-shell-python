@@ -23,7 +23,6 @@ def locate_in_path(command):
     return shutil.which(command)
 
 
-# autocomplete
 def complete(text, state):
 
     commands = set(builtins)
@@ -46,20 +45,21 @@ def complete(text, state):
         except:
             pass
 
+    # add current directory files
+    for file in os.listdir("."):
+        commands.add(file)
+
     matches = sorted([cmd for cmd in commands if cmd.startswith(text)])
 
-    if len(matches) == 1:
-
-        if state == 0:
-            return matches[0] + " "
-
-        return None
-
     if state < len(matches):
+
+        # add space if this is the final/full completion
+        if len(matches) == 1:
+            return matches[state] + " "
+
         return matches[state]
 
     return None
-
 
 # display autocomplete matches
 def display_matches(substitution, matches, longest_match_length):
