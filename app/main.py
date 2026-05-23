@@ -16,6 +16,9 @@ builtins = [
 ]
 
 
+COMPLETION_SCRIPT_REGISTRY = {}
+
+
 REDIRECT_OPS = {
     ">": ("stdout", "w"),
     "1>": ("stdout", "w"),
@@ -145,7 +148,7 @@ def parse_redirect(args):
 
         if arg in REDIRECT_OPS and i + 1 < len(args):
 
-            stream, mode = REDIRECT_OPS[arg]
+            stream, mode, = REDIRECT_OPS[arg]
 
             return stream, mode, i, args[i + 1]
 
@@ -175,7 +178,7 @@ def ensure_parent_directory(filepath):
         os.makedirs(directory, exist_ok=True)
 
 
-# write builtin output
+# write output
 def write_output(output, redirect):
 
     if redirect is None:
@@ -199,7 +202,7 @@ def write_output(output, redirect):
         sys.stdout.write(output)
 
 
-# execute external commands
+# external commands
 def execute_external(program, args):
 
     executable = locate_in_path(program)
@@ -341,15 +344,43 @@ def main():
         # complete builtin
         elif program == "complete":
 
+            # complete -p cmd
             if (
                 len(actual_args) == 2
                 and actual_args[0] == "-p"
             ):
-                output = (
-                    f"complete: {actual_args[1]}: "
-                    "no completion specification\n"
-                )
+
+                cmd = actual_args[1]
+
+                if cmd in COMPLETION_SCRIPT_REGISTRY:
+
+                    output = (
+                        f"complete -C "
+                        f"'{COMPLETION_SCRIPT_REGISTRY[cmd]}' "
+                        f"{cmd}\n"
+                    )
+
+                else:
+
+                    output = (
+                        f"complete: {cmd}: "
+                        "no completion specification\n"
+                    )
+
+            # complete -C script cmd
+            elif (
+                len(actual_args) == 3
+                and actual_args[0] == "-C"
+            ):
+
+                COMPLETION_SCRIPT_REGISTRY[
+                    actual_args[2]
+                ] = actual_args[1]
+
+                output = ""
+
             else:
+
                 output = "complete is a shell builtin\n"
 
             write_output(output, redirect)
@@ -384,7 +415,7 @@ def main():
 
             write_output(output, redirect)
 
-        # external commands
+        # external
         else:
             execute_external(program, args)
 
