@@ -26,43 +26,73 @@ def locate_in_path(command):
 # autocomplete
 def complete(text, state):
 
-    commands = set(builtins)
+    line = readline.get_line_buffer()
+    words = line.split()
 
-    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+    # command completion
+    if len(words) <= 1:
 
-    for directory in path_dirs:
+        commands = set(builtins)
 
-        if not os.path.isdir(directory):
-            continue
+        path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+
+        for directory in path_dirs:
+
+            if not os.path.isdir(directory):
+                continue
+
+            try:
+                for file in os.listdir(directory):
+
+                    full_path = os.path.join(directory, file)
+
+                    if (
+                        os.path.isfile(full_path)
+                        and os.access(full_path, os.X_OK)
+                    ):
+                        commands.add(file)
+
+            except:
+                pass
+
+        matches = sorted(
+            [cmd for cmd in commands if cmd.startswith(text)]
+        )
+
+    # file completion
+    else:
+
+        path = "."
+        prefix = text
+
+        if "/" in text:
+
+            path, prefix = os.path.split(text)
+
+            if path == "":
+                path = "."
 
         try:
-            for file in os.listdir(directory):
-
-                full_path = os.path.join(directory, file)
-
-                if os.path.isfile(full_path) and os.access(full_path, os.X_OK):
-                    commands.add(file)
+            matches = sorted(
+                [
+                    os.path.join(path, f)
+                    if path != "."
+                    else f
+                    for f in os.listdir(path)
+                    if f.startswith(prefix)
+                ]
+            )
 
         except:
-            pass
-
-    # current directory files
-    for file in os.listdir("."):
-        commands.add(file)
-
-    matches = sorted([cmd for cmd in commands if cmd.startswith(text)])
+            matches = []
 
     if state < len(matches):
-
-        if len(matches) == 1:
-            return matches[state] + " "
-
-        return matches[state]
+        return matches[state] + " "
 
     return None
 
 
-# display autocomplete matches
+# display matches
 def display_matches(substitution, matches, longest_match_length):
 
     print()
@@ -72,7 +102,7 @@ def display_matches(substitution, matches, longest_match_length):
     sys.stdout.flush()
 
 
-# parse redirect
+# parse redirects
 def parse_redirect(args):
 
     for i, arg in enumerate(args):
@@ -86,7 +116,7 @@ def parse_redirect(args):
     return None
 
 
-# remove redirect tokens
+# remove redirects
 def clean_args(args):
 
     redirect = parse_redirect(args)
@@ -100,7 +130,7 @@ def clean_args(args):
     return args
 
 
-# create directories if needed
+# create parent dirs
 def ensure_parent_directory(filepath):
 
     directory = os.path.dirname(filepath)
@@ -109,7 +139,7 @@ def ensure_parent_directory(filepath):
         os.makedirs(directory, exist_ok=True)
 
 
-# builtin output handling
+# write builtin output
 def write_output(output, redirect):
 
     if redirect is None:
@@ -133,13 +163,13 @@ def write_output(output, redirect):
             pass
 
 
-# external command execution
+# execute external commands
 def execute_external(program, args):
 
     executable = locate_in_path(program)
 
     if not executable:
-        print(f"{program}: command not found")
+        sys.stderr.write(f"{program}: command not found\n")
         return
 
     redirect = parse_redirect(args)
@@ -151,11 +181,11 @@ def execute_external(program, args):
             subprocess.run([program] + args)
 
         except FileNotFoundError:
-            print(f"{program}: command not found")
+            sys.stderr.write(f"{program}: command not found\n")
 
         return
 
-    # redirect exists
+    # with redirect
     stream, mode, op_index, filepath = redirect
 
     ensure_parent_directory(filepath)
@@ -179,7 +209,7 @@ def execute_external(program, args):
         )
 
     except FileNotFoundError:
-        print(f"{program}: command not found")
+        sys.stderr.write(f"{program}: command not found\n")
 
     finally:
 
@@ -193,6 +223,11 @@ def execute_external(program, args):
 def main():
 
     readline.set_completer(complete)
+
+    # important for filename completion
+    delims = readline.get_completer_delims()
+    readline.set_completer_delims(delims.replace("-", ""))
+
     readline.parse_and_bind("tab: complete")
     readline.set_completion_display_matches_hook(display_matches)
 
@@ -201,12 +236,20 @@ def main():
         sys.stdout.write("$ ")
         sys.stdout.flush()
 
-        command = input().strip()
+        try:
+            command = input()
 
-        if not command:
+        except EOFError:
+            break
+
+        if not command.strip():
             continue
 
-        parts = shlex.split(command)
+        try:
+            parts = shlex.split(command)
+
+        except ValueError:
+            continue
 
         if not parts:
             continue
@@ -252,7 +295,9 @@ def main():
                 os.chdir(path)
 
             except FileNotFoundError:
-                print(f"cd: {actual_args[0]}: No such file or directory")
+                sys.stderr.write(
+                    f"cd: {actual_args[0]}: No such file or directory\n"
+                )
 
         # type
         elif program == "type":
@@ -278,7 +323,7 @@ def main():
 
             write_output(output, redirect)
 
-        # external commands
+        # external
         else:
             execute_external(program, args)
 
