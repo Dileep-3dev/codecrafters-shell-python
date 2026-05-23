@@ -84,36 +84,38 @@ def complete(text, state):
             if cmd.startswith(text):
                 matches.append(cmd + " ")
 
-    # file completion
-    try:
+    # filepath completion
+    else:
 
-        if "/" in text:
+        try:
 
-            dirpath, prefix = os.path.split(text)
+            if "/" in text:
 
-            if dirpath == "":
-                dirpath = "."
+                dirpath, prefix = os.path.split(text)
 
-            for entry in os.listdir(dirpath):
+                if dirpath == "":
+                    dirpath = "."
 
-                if entry.startswith(prefix):
+                for entry in os.listdir(dirpath):
 
-                    full_match = os.path.join(dirpath, entry)
+                    if entry.startswith(prefix):
 
-                    if full_match.startswith("./"):
-                        full_match = full_match[2:]
+                        full_match = os.path.join(dirpath, entry)
 
-                    matches.append(format_match(full_match))
+                        if full_match.startswith("./"):
+                            full_match = full_match[2:]
 
-        else:
+                        matches.append(format_match(full_match))
 
-            for entry in os.listdir("."):
+            else:
 
-                if entry.startswith(text):
-                    matches.append(format_match(entry))
+                for entry in os.listdir("."):
 
-    except FileNotFoundError:
-        pass
+                    if entry.startswith(text):
+                        matches.append(format_match(entry))
+
+        except FileNotFoundError:
+            pass
 
     matches = sorted(set(matches))
 
@@ -191,10 +193,10 @@ def write_output(output, redirect):
 
     else:
 
-        sys.stdout.write(output)
-
         with open(filepath, mode):
             pass
+
+        sys.stdout.write(output)
 
 
 # execute external commands
@@ -338,7 +340,18 @@ def main():
 
         # complete builtin
         elif program == "complete":
-            output = "complete is a shell builtin\n"
+
+            if (
+                len(actual_args) == 2
+                and actual_args[0] == "-p"
+            ):
+                output = (
+                    f"complete: {actual_args[1]}: "
+                    "no completion specification\n"
+                )
+            else:
+                output = "complete is a shell builtin\n"
+
             write_output(output, redirect)
 
         # type
