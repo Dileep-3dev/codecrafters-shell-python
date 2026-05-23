@@ -23,6 +23,7 @@ def locate_in_path(command):
     return shutil.which(command)
 
 
+# autocomplete
 def complete(text, state):
 
     commands = set(builtins)
@@ -45,7 +46,7 @@ def complete(text, state):
         except:
             pass
 
-    # add current directory files
+    # current directory files
     for file in os.listdir("."):
         commands.add(file)
 
@@ -53,13 +54,13 @@ def complete(text, state):
 
     if state < len(matches):
 
-        # add space if this is the final/full completion
         if len(matches) == 1:
             return matches[state] + " "
 
         return matches[state]
 
     return None
+
 
 # display autocomplete matches
 def display_matches(substitution, matches, longest_match_length):
@@ -99,6 +100,15 @@ def clean_args(args):
     return args
 
 
+# create directories if needed
+def ensure_parent_directory(filepath):
+
+    directory = os.path.dirname(filepath)
+
+    if directory:
+        os.makedirs(directory, exist_ok=True)
+
+
 # builtin output handling
 def write_output(output, redirect):
 
@@ -108,6 +118,8 @@ def write_output(output, redirect):
 
     stream, mode, _, filepath = redirect
 
+    ensure_parent_directory(filepath)
+
     if stream == "stdout":
 
         with open(filepath, mode) as file:
@@ -116,6 +128,9 @@ def write_output(output, redirect):
     else:
 
         sys.stdout.write(output)
+
+        with open(filepath, mode):
+            pass
 
 
 # external command execution
@@ -142,6 +157,8 @@ def execute_external(program, args):
 
     # redirect exists
     stream, mode, op_index, filepath = redirect
+
+    ensure_parent_directory(filepath)
 
     stdout_target = None
     stderr_target = None
