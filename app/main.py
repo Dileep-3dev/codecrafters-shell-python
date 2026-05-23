@@ -3,6 +3,7 @@ import os
 import subprocess
 import shutil
 import shlex
+import readline
 
 
 builtins = ["echo", "exit", "type", "pwd", "cd"]
@@ -12,7 +13,41 @@ def locate_in_path(command):
     return shutil.which(command)
 
 
+# autocomplete
+def complete(text, state):
+
+    commands = builtins[:]
+
+    path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+
+    for directory in path_dirs:
+
+        try:
+            for file in os.listdir(directory):
+
+                full_path = os.path.join(directory, file)
+
+                if os.access(full_path, os.X_OK):
+
+                    if file not in commands:
+                        commands.append(file)
+
+        except FileNotFoundError:
+            continue
+
+    matches = [cmd for cmd in commands if cmd.startswith(text)]
+
+    if state < len(matches):
+        return matches[state] + " "
+
+    return None
+
+
 def main():
+
+    # enable tab completion
+    readline.set_completer(complete)
+    readline.parse_and_bind("tab: complete")
 
     while True:
 
@@ -24,8 +59,8 @@ def main():
         if not command:
             continue
 
-        # output redirection support
-        if ">" in command or "1>" in command:
+        # redirection support
+        if ">" in command or "1>" in command or "2>" in command:
             os.system(command)
             continue
 
@@ -53,7 +88,6 @@ def main():
         # cd
         elif program == "cd":
 
-            # cd -> home
             if not args:
                 os.chdir(os.path.expanduser("~"))
                 continue
