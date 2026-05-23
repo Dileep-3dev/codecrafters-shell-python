@@ -71,7 +71,7 @@ def display_matches(substitution, matches, longest_match_length):
     sys.stdout.flush()
 
 
-# parse redirection
+# parse redirect
 def parse_redirect(args):
 
     for i, arg in enumerate(args):
@@ -85,7 +85,7 @@ def parse_redirect(args):
     return None
 
 
-# remove redirect parts from args
+# remove redirect tokens
 def clean_args(args):
 
     redirect = parse_redirect(args)
@@ -99,11 +99,11 @@ def clean_args(args):
     return args
 
 
-# write builtin output
-def handle_builtin_output(output, redirect):
+# builtin output handling
+def write_output(output, redirect):
 
     if redirect is None:
-        print(output, end="")
+        sys.stdout.write(output)
         return
 
     stream, mode, _, filepath = redirect
@@ -115,13 +115,10 @@ def handle_builtin_output(output, redirect):
 
     else:
 
-        print(output, end="")
-
-        with open(filepath, mode) as file:
-            pass
+        sys.stdout.write(output)
 
 
-# execute external commands
+# external command execution
 def execute_external(program, args):
 
     executable = locate_in_path(program)
@@ -178,7 +175,6 @@ def execute_external(program, args):
 
 def main():
 
-    # autocomplete setup
     readline.set_completer(complete)
     readline.parse_and_bind("tab: complete")
     readline.set_completion_display_matches_hook(display_matches)
@@ -217,14 +213,14 @@ def main():
 
             output = " ".join(actual_args) + "\n"
 
-            handle_builtin_output(output, redirect)
+            write_output(output, redirect)
 
         # pwd
         elif program == "pwd":
 
             output = os.getcwd() + "\n"
 
-            handle_builtin_output(output, redirect)
+            write_output(output, redirect)
 
         # cd
         elif program == "cd":
@@ -263,7 +259,7 @@ def main():
                 else:
                     output = f"{command_type}: not found\n"
 
-            handle_builtin_output(output, redirect)
+            write_output(output, redirect)
 
         # external commands
         else:
