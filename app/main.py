@@ -72,6 +72,56 @@ def clean_args(args):
 
 
 # =========================
+# REAP COMPLETED JOBS
+# =========================
+def reap_completed_jobs():
+
+    global BACKGROUND_JOBS
+
+    output = ""
+
+    total_jobs = len(
+        BACKGROUND_JOBS
+    )
+
+    jobs_to_remove = []
+
+    for index, job in enumerate(
+        BACKGROUND_JOBS
+    ):
+
+        process = job["process"]
+
+        if process.poll() is None:
+            continue
+
+        marker = " "
+
+        if index == total_jobs - 1:
+            marker = "+"
+
+        elif index == total_jobs - 2:
+            marker = "-"
+
+        output += (
+            f"[{job['job_number']}]"
+            f"{marker}  "
+            f"{'Done':<24}"
+            f"{job['command_done']}\n"
+        )
+
+        jobs_to_remove.append(job)
+
+    for job in jobs_to_remove:
+
+        BACKGROUND_JOBS.remove(job)
+
+    if output:
+        sys.stdout.write(output)
+        sys.stdout.flush()
+
+
+# =========================
 # PROGRAMMABLE COMPLETION
 # =========================
 def run_completion_script(command):
@@ -388,7 +438,6 @@ def execute_external(program, args):
             "command_done": (
                 f"{program} {' '.join(args)}"
             ),
-            "status": "Running",
             "process": process,
         }
 
@@ -462,6 +511,11 @@ def main():
     )
 
     while True:
+
+        # =====================
+        # AUTO REAP
+        # =====================
+        reap_completed_jobs()
 
         try:
             command = input("$ ")
@@ -613,7 +667,6 @@ def main():
         # =====================
         elif program == "complete":
 
-            # complete -C script cmd
             if (
                 len(actual_args) == 3
                 and actual_args[0] == "-C"
@@ -625,7 +678,6 @@ def main():
 
                 output = ""
 
-            # complete -r cmd
             elif (
                 len(actual_args) == 2
                 and actual_args[0] == "-r"
@@ -640,7 +692,6 @@ def main():
 
                 output = ""
 
-            # complete -p cmd
             elif (
                 len(actual_args) == 2
                 and actual_args[0] == "-p"
