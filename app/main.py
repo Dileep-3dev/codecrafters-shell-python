@@ -78,8 +78,27 @@ def run_completion_script(command):
 
     try:
 
+        line = readline.get_line_buffer()
+
+        words = line.split()
+
+        current_word = ""
+
+        if not line.endswith(" "):
+            current_word = words[-1]
+
+        previous_word = ""
+
+        if len(words) >= 2:
+            previous_word = words[-2]
+
         process = subprocess.Popen(
-            [script],
+            [
+                script,
+                command,
+                current_word,
+                previous_word,
+            ],
             bufsize=1,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -90,12 +109,12 @@ def run_completion_script(command):
 
         def handle_output(stream, mask):
 
-            line = stream.readline().rstrip("\n")
+            output = stream.readline().rstrip("\n")
 
-            if not line:
+            if not output:
                 return
 
-            matches.append(line + " ")
+            matches.append(output)
 
         with selectors.DefaultSelector() as selector:
 
@@ -121,13 +140,13 @@ def run_completion_script(command):
             # drain remaining output
             while True:
 
-                line = process.stdout.readline()
+                output = process.stdout.readline()
 
-                if not line:
+                if not output:
                     break
 
                 matches.append(
-                    line.rstrip("\n") + " "
+                    output.rstrip("\n")
                 )
 
             process.wait()
@@ -189,6 +208,7 @@ def complete(text, state):
             if cmd.startswith(text)
         ])
 
+        # auto append space on single command completion
         if len(matches) == 1:
 
             match = matches[0]
@@ -207,12 +227,22 @@ def complete(text, state):
         if (
             len(words) >= 1
             and words[0] in COMPLETION_SCRIPT_REGISTRY
-            and text == ""
         ):
 
-            matches = run_completion_script(
+            raw_matches = run_completion_script(
                 words[0]
             )
+
+            matches = []
+
+            for match in raw_matches:
+
+                if match.startswith(text):
+
+                    if len(raw_matches) == 1:
+                        matches.append(match + " ")
+                    else:
+                        matches.append(match)
 
         else:
 
