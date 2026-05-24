@@ -65,13 +65,6 @@ def complete(text, state):
 
     matches = []
 
-    def format_match(path):
-
-        if os.path.isdir(path):
-            return path + "/"
-
-        return path + " "
-
     buffer = readline.get_line_buffer()
 
     tokens = buffer.split()
@@ -112,10 +105,16 @@ def complete(text, state):
             except:
                 pass
 
-        for cmd in commands:
+        command_matches = sorted(
+            [cmd for cmd in commands if cmd.startswith(text)]
+        )
 
-            if cmd.startswith(text):
+        for cmd in command_matches:
+
+            if len(command_matches) == 1:
                 matches.append(cmd + " ")
+            else:
+                matches.append(cmd)
 
     # programmable completion
     elif text == "":
@@ -141,23 +140,27 @@ def complete(text, state):
                 if dirpath == "":
                     dirpath = "."
 
-                for entry in os.listdir(dirpath):
-
-                    if entry.startswith(prefix):
-
-                        full_match = os.path.join(dirpath, entry)
-
-                        if full_match.startswith("./"):
-                            full_match = full_match[2:]
-
-                        matches.append(format_match(full_match))
-
             else:
 
-                for entry in os.listdir("."):
+                dirpath = "."
+                prefix = text
 
-                    if entry.startswith(text):
-                        matches.append(format_match(entry))
+            for entry in os.listdir(dirpath):
+
+                if entry.startswith(prefix):
+
+                    full_match = os.path.join(dirpath, entry)
+
+                    if full_match.startswith("./"):
+                        full_match = full_match[2:]
+
+                    # directory
+                    if os.path.isdir(full_match):
+                        matches.append(full_match + "/")
+
+                    # file
+                    else:
+                        matches.append(full_match + " ")
 
         except FileNotFoundError:
             pass
