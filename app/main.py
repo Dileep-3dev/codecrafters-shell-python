@@ -557,10 +557,25 @@ def main():
 
             output = ""
 
-            for job in BACKGROUND_JOBS:
+            total_jobs = len(
+                BACKGROUND_JOBS
+            )
+
+            for index, job in enumerate(
+                BACKGROUND_JOBS
+            ):
+
+                marker = " "
+
+                if index == total_jobs - 1:
+                    marker = "+"
+
+                elif index == total_jobs - 2:
+                    marker = "-"
 
                 output += (
-                    f"[{job['job_number']}]+  "
+                    f"[{job['job_number']}]"
+                    f"{marker}  "
                     f"{job['status']:<24}"
                     f"{job['command']}\n"
                 )
