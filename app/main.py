@@ -1118,7 +1118,22 @@ def main():
             )
         elif program == "declare":
 
-            output = ""
+            # declare -p variable
+            if (
+                len(actual_args) == 2
+                and actual_args[0] == "-p"
+            ):
+
+                variable = actual_args[1]
+
+                output = (
+                    f"declare: {variable}: "
+                    "not found\n"
+                )
+
+            else:
+
+                output = ""
 
             write_output(
                 output,
