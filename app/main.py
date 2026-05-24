@@ -19,6 +19,10 @@ BUILTINS = [
 
 COMPLETION_SCRIPT_REGISTRY = {}
 
+BACKGROUND_JOBS = []
+
+NEXT_JOB_NUMBER = 1
+
 REDIRECT_OPS = {
     ">": ("stdout", "w"),
     "1>": ("stdout", "w"),
@@ -352,6 +356,8 @@ def write_output(output, redirect):
 # =========================
 def execute_external(program, args):
 
+    global NEXT_JOB_NUMBER
+
     executable = locate_in_path(program)
 
     if not executable:
@@ -382,9 +388,20 @@ def execute_external(program, args):
             [program] + args
         )
 
+        job = {
+            "job_number": NEXT_JOB_NUMBER,
+            "pid": process.pid,
+            "command": f"{program} {' '.join(args)} &",
+            "status": "Running",
+        }
+
+        BACKGROUND_JOBS.append(job)
+
         print(
-            f"[1] {process.pid}"
+            f"[{NEXT_JOB_NUMBER}] {process.pid}"
         )
+
+        NEXT_JOB_NUMBER += 1
 
         return
 
@@ -539,6 +556,14 @@ def main():
         elif program == "jobs":
 
             output = ""
+
+            for job in BACKGROUND_JOBS:
+
+                output += (
+                    f"[{job['job_number']}]+  "
+                    f"{job['status']:<24}"
+                    f"{job['command']}\n"
+                )
 
             write_output(
                 output,
