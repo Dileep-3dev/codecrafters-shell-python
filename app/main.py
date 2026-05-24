@@ -4,6 +4,7 @@ import subprocess
 import shutil
 import shlex
 import readline
+import selectors
 
 
 BUILTINS = [
@@ -77,18 +78,61 @@ def run_completion_script(command):
 
     try:
 
-        result = subprocess.run(
+        process = subprocess.Popen(
             [script],
-            capture_output=True,
-            text=True
+            bufsize=1,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            universal_newlines=True,
         )
 
-        output = result.stdout.strip()
+        matches = []
 
-        if not output:
-            return []
+        def handle_output(stream, mask):
 
-        return [output + " "]
+            line = stream.readline().rstrip("\n")
+
+            if not line:
+                return
+
+            matches.append(line + " ")
+
+        with selectors.DefaultSelector() as selector:
+
+            selector.register(
+                process.stdout,
+                selectors.EVENT_READ,
+                handle_output
+            )
+
+            while process.poll() is None:
+
+                events = selector.select()
+
+                for key, mask in events:
+
+                    callback = key.data
+
+                    callback(
+                        key.fileobj,
+                        mask
+                    )
+
+            # drain remaining output
+            while True:
+
+                line = process.stdout.readline()
+
+                if not line:
+                    break
+
+                matches.append(
+                    line.rstrip("\n") + " "
+                )
+
+            process.wait()
+
+        return matches
 
     except:
         return []
@@ -166,7 +210,9 @@ def complete(text, state):
             and text == ""
         ):
 
-            matches = run_completion_script(words[0])
+            matches = run_completion_script(
+                words[0]
+            )
 
         else:
 
