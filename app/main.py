@@ -5,6 +5,7 @@ import shutil
 import shlex
 import readline
 import selectors
+import io
 
 
 BUILTINS = [
@@ -140,6 +141,64 @@ def reap_completed_jobs():
 
 
 # =========================
+# BUILTIN OUTPUT
+# =========================
+def builtin_output(program, args):
+
+    actual_args = clean_args(args)
+
+    # =====================
+    # ECHO
+    # =====================
+    if program == "echo":
+
+        return (
+            " ".join(actual_args)
+            + "\n"
+        )
+
+    # =====================
+    # PWD
+    # =====================
+    elif program == "pwd":
+
+        return (
+            os.getcwd()
+            + "\n"
+        )
+
+    # =====================
+    # TYPE
+    # =====================
+    elif program == "type":
+
+        if not actual_args:
+            return ""
+
+        cmd = actual_args[0]
+
+        if cmd in BUILTINS:
+
+            return (
+                f"{cmd} is a shell builtin\n"
+            )
+
+        executable = locate_in_path(cmd)
+
+        if executable:
+
+            return (
+                f"{cmd} is {executable}\n"
+            )
+
+        return (
+            f"{cmd}: not found\n"
+        )
+
+    return ""
+
+
+# =========================
 # PROGRAMMABLE COMPLETION
 # =========================
 def run_completion_script(command):
@@ -249,9 +308,6 @@ def complete(text, state):
 
     matches = []
 
-    # -------------------------
-    # COMMAND COMPLETION
-    # -------------------------
     if len(words) <= 1 and not line.endswith(" "):
 
         commands = set(BUILTINS)
@@ -298,9 +354,6 @@ def complete(text, state):
             else:
                 matches[0] = match + " "
 
-    # -------------------------
-    # ARGUMENT COMPLETION
-    # -------------------------
     else:
 
         if (
@@ -426,6 +479,65 @@ def execute_pipeline(left_command, right_command):
         right_command.strip()
     )
 
+    left_program = left_parts[0]
+    left_args = left_parts[1:]
+
+    right_program = right_parts[0]
+    right_args = right_parts[1:]
+
+    # =====================
+    # LEFT SIDE
+    # =====================
+    if left_program in BUILTINS:
+
+        left_output = builtin_output(
+            left_program,
+            left_args
+        )
+
+        left_process = subprocess.Popen(
+            right_parts,
+            stdin=subprocess.PIPE,
+            text=True,
+        )
+
+        left_process.communicate(
+            left_output
+        )
+
+        return
+
+    # =====================
+    # RIGHT SIDE
+    # =====================
+    if right_program in BUILTINS:
+
+        left_process = subprocess.Popen(
+            left_parts,
+            stdout=subprocess.PIPE,
+            text=True,
+        )
+
+        left_output = (
+            left_process.stdout.read()
+        )
+
+        result = builtin_output(
+            right_program,
+            right_args
+        )
+
+        sys.stdout.write(result)
+
+        left_process.stdout.close()
+
+        left_process.wait()
+
+        return
+
+    # =====================
+    # NORMAL PIPELINE
+    # =====================
     left_process = subprocess.Popen(
         left_parts,
         stdout=subprocess.PIPE,
@@ -464,9 +576,6 @@ def execute_external(program, args):
 
     redirect = parse_redirect(args)
 
-    # =========================
-    # BACKGROUND EXECUTION
-    # =========================
     if background:
 
         process = subprocess.Popen(
@@ -499,9 +608,6 @@ def execute_external(program, args):
 
         return
 
-    # =========================
-    # FOREGROUND EXECUTION
-    # =========================
     if redirect is None:
 
         subprocess.run([program] + args)
@@ -560,9 +666,6 @@ def main():
 
     while True:
 
-        # =====================
-        # AUTO REAP
-        # =====================
         reap_completed_jobs()
 
         try:
@@ -625,20 +728,30 @@ def main():
         # =====================
         elif program == "echo":
 
-            output = " ".join(
+            output = builtin_output(
+                program,
                 actual_args
-            ) + "\n"
+            )
 
-            write_output(output, redirect)
+            write_output(
+                output,
+                redirect
+            )
 
         # =====================
         # PWD
         # =====================
         elif program == "pwd":
 
-            output = os.getcwd() + "\n"
+            output = builtin_output(
+                program,
+                actual_args
+            )
 
-            write_output(output, redirect)
+            write_output(
+                output,
+                redirect
+            )
 
         # =====================
         # CD
@@ -791,34 +904,15 @@ def main():
         # =====================
         elif program == "type":
 
-            if not actual_args:
-                continue
+            output = builtin_output(
+                program,
+                actual_args
+            )
 
-            cmd = actual_args[0]
-
-            if cmd in BUILTINS:
-
-                output = (
-                    f"{cmd} is a shell builtin\n"
-                )
-
-            else:
-
-                executable = locate_in_path(cmd)
-
-                if executable:
-
-                    output = (
-                        f"{cmd} is {executable}\n"
-                    )
-
-                else:
-
-                    output = (
-                        f"{cmd}: not found\n"
-                    )
-
-            write_output(output, redirect)
+            write_output(
+                output,
+                redirect
+            )
 
         # =====================
         # EXTERNAL COMMAND
