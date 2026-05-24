@@ -6,7 +6,7 @@ import shlex
 import readline
 
 
-builtins = [
+BUILTINS = [
     "echo",
     "exit",
     "type",
@@ -15,9 +15,7 @@ builtins = [
     "complete",
 ]
 
-
 COMPLETION_SCRIPT_REGISTRY = {}
-
 
 REDIRECT_OPS = {
     ">": ("stdout", "w"),
@@ -33,244 +31,14 @@ def locate_in_path(command):
     return shutil.which(command)
 
 
-def run_completion_script(command_name):
+def ensure_parent_directory(filepath):
 
-    completer = COMPLETION_SCRIPT_REGISTRY.get(command_name)
+    directory = os.path.dirname(filepath)
 
-    if not completer:
-        return ""
+    if directory:
+        os.makedirs(directory, exist_ok=True)
 
-    try:
 
-        result = subprocess.run(
-            [completer],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-
-        lines = result.stdout.splitlines()
-
-        if lines:
-            return lines[0]
-
-    except:
-        pass
-
-    return ""
-
-
-def complete(text, state):
-
-    matches = []
-
-    line = readline.get_line_buffer()
-
-    words = line.split()
-
-    # first token -> command completion
-    if len(words) <= 1 and not line.endswith(" "):
-
-        commands = set(builtins)
-
-        path_dirs = os.environ.get("PATH", "").split(os.pathsep)
-
-        for directory in path_dirs:
-
-            if not os.path.isdir(directory):
-                continue
-
-            try:
-
-                for entry in os.listdir(directory):
-
-                    full_path = os.path.join(directory, entry)
-
-                    if (
-                        os.path.isfile(full_path)
-                        and os.access(full_path, os.X_OK)
-                    ):
-                        commands.add(entry)
-
-            except:
-                pass
-
-        matches = sorted(
-            [cmd for cmd in commands if cmd.startswith(text)]
-        )
-
-        # single command match -> add space
-        if len(matches) == 1:
-            matches[0] += " "
-
-    # everything after first command -> filepath completion
-    else:
-
-        if "/" in text:
-
-            directory, prefix = os.path.split(text)
-
-            if directory == "":
-                directory = "."
-
-        else:
-
-            directory = "."
-            prefix = text
-
-        try:
-
-            for entry in os.listdir(directory):
-
-                if entry.startswith(prefix):
-
-                    full_path = os.path.join(directory, entry)
-
-                    if full_path.startswith("./"):
-                        full_path = full_path[2:]
-
-                    if os.path.isdir(full_path):
-                        matches.append(full_path + "/")
-                    else:
-                        matches.append(full_path + " ")
-
-        except FileNotFoundError:
-            pass
-
-        matches = sorted(matches)
-
-    if state < len(matches):
-        return matches[state]
-
-    return None
-
-    matches = []
-
-    buffer = readline.get_line_buffer()
-
-    tokens = buffer.split()
-
-    completing_command = (
-        not buffer.strip()
-        or (
-            not buffer.endswith(" ")
-            and len(tokens) == 1
-        )
-    )
-
-    # command completion
-    if completing_command:
-
-        commands = set(builtins)
-
-        path_dirs = os.environ.get("PATH", "").split(os.pathsep)
-
-        for directory in path_dirs:
-
-            if not os.path.isdir(directory):
-                continue
-
-            try:
-
-                for entry in os.listdir(directory):
-
-                    full_path = os.path.join(directory, entry)
-
-                    if (
-                        entry.startswith(text)
-                        and os.path.isfile(full_path)
-                        and os.access(full_path, os.X_OK)
-                    ):
-                        commands.add(entry)
-
-            except:
-                pass
-
-        command_matches = sorted(
-            [cmd for cmd in commands if cmd.startswith(text)]
-        )
-
-        # FIXED: if single directory-like match don't add space
-        if len(command_matches) == 1:
-
-            cmd = command_matches[0]
-
-            matches.append(cmd)
-
-        else:
-            matches.extend(command_matches)
-
-    # programmable completion
-    elif text == "":
-
-        if len(tokens) == 1:
-
-            command_name = tokens[0]
-
-            completion = run_completion_script(command_name)
-
-            if completion:
-                matches.append(completion + " ")
-
-    # filepath completion
-    else:
-
-        try:
-
-            if "/" in text:
-
-                dirpath, prefix = os.path.split(text)
-
-                if dirpath == "":
-                    dirpath = "."
-
-            else:
-
-                dirpath = "."
-                prefix = text
-
-            for entry in os.listdir(dirpath):
-
-                if entry.startswith(prefix):
-
-                    full_match = os.path.join(dirpath, entry)
-
-                    if full_match.startswith("./"):
-                        full_match = full_match[2:]
-
-                    # directory
-                    if os.path.isdir(full_match):
-                        matches.append(full_match + "/")
-
-                    # file
-                    else:
-                        matches.append(full_match + " ")
-
-        except FileNotFoundError:
-            pass
-
-    matches = sorted(set(matches))
-
-    if not matches:
-        return None
-
-    if state < len(matches):
-        return matches[state]
-
-    return None
-
-
-# display autocomplete matches
-def display_matches(substitution, matches, longest_match_length):
-
-    print()
-    print("  ".join(sorted(matches)))
-
-    sys.stdout.write("$ " + readline.get_line_buffer())
-    sys.stdout.flush()
-
-
-# parse redirects
 def parse_redirect(args):
 
     for i, arg in enumerate(args):
@@ -284,30 +52,189 @@ def parse_redirect(args):
     return None
 
 
-# remove redirects
 def clean_args(args):
 
     redirect = parse_redirect(args)
 
     if redirect:
 
-        _, _, op_index, _ = redirect
+        _, _, index, _ = redirect
 
-        return args[:op_index]
+        return args[:index]
 
     return args
 
 
-# create parent dirs
-def ensure_parent_directory(filepath):
+# =========================
+# PROGRAMMABLE COMPLETION
+# =========================
+def run_completion_script(command):
 
-    directory = os.path.dirname(filepath)
+    script = COMPLETION_SCRIPT_REGISTRY.get(command)
 
-    if directory:
-        os.makedirs(directory, exist_ok=True)
+    if not script:
+        return []
+
+    try:
+
+        result = subprocess.run(
+            [script],
+            capture_output=True,
+            text=True
+        )
+
+        output = result.stdout.strip()
+
+        if not output:
+            return []
+
+        return [output + " "]
+
+    except:
+        return []
 
 
-# write output
+# =========================
+# AUTOCOMPLETE
+# =========================
+def complete(text, state):
+
+    line = readline.get_line_buffer()
+
+    words = line.split()
+
+    matches = []
+
+    # -------------------------
+    # COMMAND COMPLETION
+    # -------------------------
+    if len(words) <= 1 and not line.endswith(" "):
+
+        commands = set(BUILTINS)
+
+        path_dirs = os.environ.get(
+            "PATH",
+            ""
+        ).split(os.pathsep)
+
+        for directory in path_dirs:
+
+            if not os.path.isdir(directory):
+                continue
+
+            try:
+
+                for entry in os.listdir(directory):
+
+                    full_path = os.path.join(
+                        directory,
+                        entry
+                    )
+
+                    if (
+                        os.path.isfile(full_path)
+                        and os.access(full_path, os.X_OK)
+                    ):
+                        commands.add(entry)
+
+            except:
+                pass
+
+        matches = sorted([
+            cmd for cmd in commands
+            if cmd.startswith(text)
+        ])
+
+        if len(matches) == 1:
+
+            match = matches[0]
+
+            if os.path.isdir(match):
+                matches[0] = match + "/"
+            else:
+                matches[0] = match + " "
+
+    # -------------------------
+    # ARGUMENT COMPLETION
+    # -------------------------
+    else:
+
+        # programmable completion
+        if (
+            len(words) >= 1
+            and words[0] in COMPLETION_SCRIPT_REGISTRY
+            and text == ""
+        ):
+
+            matches = run_completion_script(words[0])
+
+        else:
+
+            if "/" in text:
+
+                directory, prefix = os.path.split(text)
+
+                if directory == "":
+                    directory = "."
+
+            else:
+
+                directory = "."
+                prefix = text
+
+            try:
+
+                for entry in os.listdir(directory):
+
+                    if entry.startswith(prefix):
+
+                        full_path = os.path.join(
+                            directory,
+                            entry
+                        )
+
+                        if full_path.startswith("./"):
+                            full_path = full_path[2:]
+
+                        if os.path.isdir(full_path):
+                            matches.append(
+                                full_path + "/"
+                            )
+                        else:
+                            matches.append(
+                                full_path + " "
+                            )
+
+            except:
+                pass
+
+            matches = sorted(matches)
+
+    if state < len(matches):
+        return matches[state]
+
+    return None
+
+
+def display_matches(
+    substitution,
+    matches,
+    longest_match_length
+):
+
+    print()
+    print("  ".join(sorted(matches)))
+
+    sys.stdout.write(
+        "$ " + readline.get_line_buffer()
+    )
+
+    sys.stdout.flush()
+
+
+# =========================
+# OUTPUT HANDLING
+# =========================
 def write_output(output, redirect):
 
     if redirect is None:
@@ -331,13 +258,17 @@ def write_output(output, redirect):
         sys.stdout.write(output)
 
 
-# external commands
+# =========================
+# EXTERNAL COMMANDS
+# =========================
 def execute_external(program, args):
 
     executable = locate_in_path(program)
 
     if not executable:
-        sys.stderr.write(f"{program}: command not found\n")
+        sys.stderr.write(
+            f"{program}: command not found\n"
+        )
         return
 
     redirect = parse_redirect(args)
@@ -345,16 +276,11 @@ def execute_external(program, args):
     # no redirect
     if redirect is None:
 
-        try:
-            subprocess.run([program] + args)
-
-        except FileNotFoundError:
-            sys.stderr.write(f"{program}: command not found\n")
+        subprocess.run([program] + args)
 
         return
 
-    # redirect exists
-    stream, mode, op_index, filepath = redirect
+    stream, mode, index, filepath = redirect
 
     ensure_parent_directory(filepath)
 
@@ -370,14 +296,11 @@ def execute_external(program, args):
             stderr_target = open(filepath, mode)
 
         subprocess.run(
-            [program] + args[:op_index],
+            [program] + args[:index],
             stdout=stdout_target,
             stderr=stderr_target,
             text=True
         )
-
-    except FileNotFoundError:
-        sys.stderr.write(f"{program}: command not found\n")
 
     finally:
 
@@ -388,13 +311,20 @@ def execute_external(program, args):
             stderr_target.close()
 
 
+# =========================
+# MAIN
+# =========================
 def main():
 
     readline.set_completer(complete)
 
-    readline.set_completer_delims(" \t\n")
+    readline.set_completer_delims(
+        " \t\n"
+    )
 
-    readline.parse_and_bind("tab: complete")
+    readline.parse_and_bind(
+        "tab: complete"
+    )
 
     readline.set_completion_display_matches_hook(
         display_matches
@@ -431,7 +361,9 @@ def main():
 
         actual_args = clean_args(args)
 
-        # exit
+        # =====================
+        # EXIT
+        # =====================
         if program == "exit":
 
             if actual_args and actual_args[0] == "0":
@@ -439,42 +371,70 @@ def main():
 
             break
 
-        # echo
+        # =====================
+        # ECHO
+        # =====================
         elif program == "echo":
 
-            output = " ".join(actual_args) + "\n"
+            output = " ".join(
+                actual_args
+            ) + "\n"
 
             write_output(output, redirect)
 
-        # pwd
+        # =====================
+        # PWD
+        # =====================
         elif program == "pwd":
 
             output = os.getcwd() + "\n"
 
             write_output(output, redirect)
 
-        # cd
+        # =====================
+        # CD
+        # =====================
         elif program == "cd":
 
             if not actual_args:
-                os.chdir(os.path.expanduser("~"))
+                os.chdir(
+                    os.path.expanduser("~")
+                )
                 continue
 
-            path = os.path.expanduser(actual_args[0])
+            path = os.path.expanduser(
+                actual_args[0]
+            )
 
             try:
                 os.chdir(path)
 
             except OSError:
+
                 sys.stderr.write(
-                    f"cd: {actual_args[0]}: No such file or directory\n"
+                    f"cd: {actual_args[0]}: "
+                    "No such file or directory\n"
                 )
 
-        # complete builtin
+        # =====================
+        # COMPLETE BUILTIN
+        # =====================
         elif program == "complete":
 
-            # complete -p cmd
+            # complete -C script cmd
             if (
+                len(actual_args) == 3
+                and actual_args[0] == "-C"
+            ):
+
+                COMPLETION_SCRIPT_REGISTRY[
+                    actual_args[2]
+                ] = actual_args[1]
+
+                output = ""
+
+            # complete -p cmd
+            elif (
                 len(actual_args) == 2
                 and actual_args[0] == "-p"
             ):
@@ -496,55 +456,51 @@ def main():
                         "no completion specification\n"
                     )
 
-            # complete -C script cmd
-            elif (
-                len(actual_args) == 3
-                and actual_args[0] == "-C"
-            ):
-
-                COMPLETION_SCRIPT_REGISTRY[
-                    actual_args[2]
-                ] = actual_args[1]
-
-                output = ""
-
             else:
 
-                output = "complete is a shell builtin\n"
+                output = (
+                    "complete is a shell builtin\n"
+                )
 
             write_output(output, redirect)
 
-        # type
+        # =====================
+        # TYPE
+        # =====================
         elif program == "type":
 
             if not actual_args:
                 continue
 
-            command_type = actual_args[0]
+            cmd = actual_args[0]
 
-            if command_type in builtins:
+            if cmd in BUILTINS:
 
                 output = (
-                    f"{command_type} is a shell builtin\n"
+                    f"{cmd} is a shell builtin\n"
                 )
 
             else:
 
-                executable = locate_in_path(command_type)
+                executable = locate_in_path(cmd)
 
                 if executable:
+
                     output = (
-                        f"{command_type} is {executable}\n"
+                        f"{cmd} is {executable}\n"
                     )
 
                 else:
+
                     output = (
-                        f"{command_type}: not found\n"
+                        f"{cmd}: not found\n"
                     )
 
             write_output(output, redirect)
 
-        # external commands
+        # =====================
+        # EXTERNAL COMMAND
+        # =====================
         else:
             execute_external(program, args)
 
