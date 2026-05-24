@@ -14,6 +14,7 @@ BUILTINS = [
     "pwd",
     "cd",
     "complete",
+    "jobs",
 ]
 
 COMPLETION_SCRIPT_REGISTRY = {}
@@ -503,6 +504,18 @@ def main():
                     f"cd: {actual_args[0]}: "
                     "No such file or directory\n"
                 )
+
+        # =====================
+        # JOBS
+        # =====================
+        elif program == "jobs":
+
+            output = ""
+
+            write_output(
+                output,
+                redirect
+            )
 
         # =====================
         # COMPLETE BUILTIN
