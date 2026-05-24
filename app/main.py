@@ -204,6 +204,13 @@ def builtin_output(program, args):
 
         history_entries = COMMAND_HISTORY
 
+        if (
+            len(actual_args) >= 2
+            and actual_args[0] == "-r"
+        ):
+
+            return ""
+
         if actual_args:
 
             try:
@@ -788,10 +795,44 @@ def main():
 
         elif program == "history":
 
-            output = builtin_output(
-                program,
-                actual_args
-            )
+            # =====================
+            # history -r <file>
+            # =====================
+            if (
+                len(actual_args) == 2
+                and actual_args[0] == "-r"
+            ):
+
+                filepath = actual_args[1]
+
+                try:
+
+                    with open(
+                        filepath,
+                        "r"
+                    ) as file:
+
+                        for line in file:
+
+                            line = line.rstrip("\n")
+
+                            if line.strip():
+
+                                COMMAND_HISTORY.append(
+                                    line
+                                )
+
+                except:
+                    pass
+
+                output = ""
+
+            else:
+
+                output = builtin_output(
+                    program,
+                    actual_args
+                )
 
             write_output(
                 output,
