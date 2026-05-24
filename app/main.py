@@ -16,7 +16,7 @@ BUILTINS = [
     "complete",
     "jobs",
     "history",
-    "declare"
+    "declare",
 ]
 
 COMPLETION_SCRIPT_REGISTRY = {}
@@ -24,6 +24,8 @@ COMPLETION_SCRIPT_REGISTRY = {}
 BACKGROUND_JOBS = []
 
 COMMAND_HISTORY = []
+
+SHELL_VARIABLES = {}
 
 LAST_HISTORY_APPEND_INDEX = 0
 
@@ -67,9 +69,29 @@ def save_history_to_histfile():
             histfile
         )
 
-        with open(histfile, "w") as file:
+        existing_commands = []
 
-            for command in COMMAND_HISTORY:
+        if os.path.exists(histfile):
+
+            with open(histfile, "r") as file:
+
+                for line in file:
+
+                    line = line.rstrip("\n")
+
+                    if line.strip():
+
+                        existing_commands.append(
+                            line
+                        )
+
+        new_commands = COMMAND_HISTORY[
+            len(existing_commands):
+        ]
+
+        with open(histfile, "a") as file:
+
+            for command in new_commands:
 
                 file.write(
                     command + "\n"
@@ -149,6 +171,7 @@ def get_next_job_number():
     used_numbers = set()
 
     for job in BACKGROUND_JOBS:
+
         used_numbers.add(
             job["job_number"]
         )
@@ -207,7 +230,9 @@ def reap_completed_jobs():
         BACKGROUND_JOBS.remove(job)
 
     if output:
+
         sys.stdout.write(output)
+
         sys.stdout.flush()
 
 
@@ -520,10 +545,13 @@ def complete(text, state):
                             full_path = full_path[2:]
 
                         if os.path.isdir(full_path):
+
                             matches.append(
                                 full_path + "/"
                             )
+
                         else:
+
                             matches.append(
                                 full_path + " "
                             )
@@ -546,6 +574,7 @@ def display_matches(
 ):
 
     print()
+
     print("  ".join(sorted(matches)))
 
     sys.stdout.write(
@@ -561,7 +590,9 @@ def display_matches(
 def write_output(output, redirect):
 
     if redirect is None:
+
         sys.stdout.write(output)
+
         return
 
     stream, mode, _, filepath = redirect
@@ -571,6 +602,7 @@ def write_output(output, redirect):
     if stream == "stdout":
 
         with open(filepath, mode) as file:
+
             file.write(output)
 
     else:
@@ -598,6 +630,7 @@ def execute_pipeline(command):
     for index, parts in enumerate(commands):
 
         program = parts[0]
+
         args = parts[1:]
 
         is_last = (
@@ -661,6 +694,7 @@ def execute_pipeline(command):
             previous_stdout.close()
 
         if not is_last:
+
             previous_stdout = (
                 process.stdout
             )
@@ -679,9 +713,11 @@ def execute_external(program, args):
     executable = locate_in_path(program)
 
     if not executable:
+
         sys.stderr.write(
             f"{program}: command not found\n"
         )
+
         return
 
     background = False
@@ -728,7 +764,9 @@ def execute_external(program, args):
 
     if redirect is None:
 
-        subprocess.run([program] + args)
+        subprocess.run(
+            [program] + args
+        )
 
         return
 
@@ -737,15 +775,24 @@ def execute_external(program, args):
     ensure_parent_directory(filepath)
 
     stdout_target = None
+
     stderr_target = None
 
     try:
 
         if stream == "stdout":
-            stdout_target = open(filepath, mode)
+
+            stdout_target = open(
+                filepath,
+                mode
+            )
 
         else:
-            stderr_target = open(filepath, mode)
+
+            stderr_target = open(
+                filepath,
+                mode
+            )
 
         subprocess.run(
             [program] + args[:index],
@@ -772,7 +819,9 @@ def main():
 
     load_history_from_histfile()
 
-    readline.set_completer(complete)
+    readline.set_completer(
+        complete
+    )
 
     readline.set_completer_delims(
         " \t\n"
@@ -791,6 +840,7 @@ def main():
         reap_completed_jobs()
 
         try:
+
             command = input("$ ")
 
         except EOFError:
@@ -800,7 +850,9 @@ def main():
             break
 
         except KeyboardInterrupt:
+
             print()
+
             continue
 
         if not command.strip():
@@ -815,6 +867,7 @@ def main():
             continue
 
         try:
+
             parts = shlex.split(command)
 
         except ValueError:
@@ -824,6 +877,7 @@ def main():
             continue
 
         program = parts[0]
+
         args = parts[1:]
 
         redirect = parse_redirect(args)
@@ -968,12 +1022,75 @@ def main():
                 redirect
             )
 
+        elif program == "declare":
+
+            # =====================
+            # declare -p NAME
+            # =====================
+            if (
+                len(actual_args) == 2
+                and actual_args[0] == "-p"
+            ):
+
+                variable = actual_args[1]
+
+                if variable in SHELL_VARIABLES:
+
+                    value = SHELL_VARIABLES[
+                        variable
+                    ]
+
+                    output = (
+                        f'declare -- '
+                        f'{variable}="{value}"\n'
+                    )
+
+                else:
+
+                    output = (
+                        f"declare: "
+                        f"{variable}: "
+                        "not found\n"
+                    )
+
+            # =====================
+            # declare NAME=VALUE
+            # =====================
+            elif (
+                len(actual_args) == 1
+                and "=" in actual_args[0]
+            ):
+
+                variable, value = (
+                    actual_args[0].split(
+                        "=",
+                        1
+                    )
+                )
+
+                SHELL_VARIABLES[
+                    variable
+                ] = value
+
+                output = ""
+
+            else:
+
+                output = ""
+
+            write_output(
+                output,
+                redirect
+            )
+
         elif program == "cd":
 
             if not actual_args:
+
                 os.chdir(
                     os.path.expanduser("~")
                 )
+
                 continue
 
             path = os.path.expanduser(
@@ -981,6 +1098,7 @@ def main():
             )
 
             try:
+
                 os.chdir(path)
 
             except OSError:
@@ -1007,9 +1125,11 @@ def main():
                 marker = " "
 
                 if index == total_jobs - 1:
+
                     marker = "+"
 
                 elif index == total_jobs - 2:
+
                     marker = "-"
 
                 process = job["process"]
@@ -1103,7 +1223,10 @@ def main():
                     "complete is a shell builtin\n"
                 )
 
-            write_output(output, redirect)
+            write_output(
+                output,
+                redirect
+            )
 
         elif program == "type":
 
@@ -1116,31 +1239,13 @@ def main():
                 output,
                 redirect
             )
-        elif program == "declare":
 
-            # declare -p variable
-            if (
-                len(actual_args) == 2
-                and actual_args[0] == "-p"
-            ):
-
-                variable = actual_args[1]
-
-                output = (
-                    f"declare: {variable}: "
-                    "not found\n"
-                )
-
-            else:
-
-                output = ""
-
-            write_output(
-                output,
-                redirect
-            )
         else:
-            execute_external(program, args)
+
+            execute_external(
+                program,
+                args
+            )
 
 
 if __name__ == "__main__":
