@@ -109,12 +109,15 @@ def complete(text, state):
             [cmd for cmd in commands if cmd.startswith(text)]
         )
 
-        for cmd in command_matches:
+        # FIXED: if single directory-like match don't add space
+        if len(command_matches) == 1:
 
-            if len(command_matches) == 1:
-                matches.append(cmd + " ")
-            else:
-                matches.append(cmd)
+            cmd = command_matches[0]
+
+            matches.append(cmd)
+
+        else:
+            matches.extend(command_matches)
 
     # programmable completion
     elif text == "":
