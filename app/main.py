@@ -68,6 +68,33 @@ def is_valid_identifier(name):
 # =========================
 def expand_variables_in_token(token):
 
+    # -------------------------
+    # ${VAR} expansion
+    # -------------------------
+    def replace_brace_variable(match):
+
+        variable_name = match.group(1)
+
+        if variable_name in SHELL_VARIABLES:
+
+            return SHELL_VARIABLES[
+                variable_name
+            ]
+
+        return os.environ.get(
+            variable_name,
+            ""
+        )
+
+    token = re.sub(
+        r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}",
+        replace_brace_variable,
+        token
+    )
+
+    # -------------------------
+    # $VAR expansion
+    # -------------------------
     def replace_variable(match):
 
         variable_name = match.group(1)
@@ -83,12 +110,13 @@ def expand_variables_in_token(token):
             ""
         )
 
-    return re.sub(
+    token = re.sub(
         r"\$([A-Za-z_][A-Za-z0-9_]*)",
         replace_variable,
         token
     )
 
+    return token
 
 def expand_variables(parts):
 
