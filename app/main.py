@@ -15,11 +15,14 @@ BUILTINS = [
     "cd",
     "complete",
     "jobs",
+    "history",
 ]
 
 COMPLETION_SCRIPT_REGISTRY = {}
 
 BACKGROUND_JOBS = []
+
+COMMAND_HISTORY = []
 
 REDIRECT_OPS = {
     ">": ("stdout", "w"),
@@ -184,6 +187,22 @@ def builtin_output(program, args):
         return (
             f"{cmd}: not found\n"
         )
+
+    elif program == "history":
+
+        output = ""
+
+        for index, command in enumerate(
+            COMMAND_HISTORY,
+            start=1
+        ):
+
+            output += (
+                f"{index:>5}  "
+                f"{command}\n"
+            )
+
+        return output
 
     return ""
 
@@ -479,18 +498,11 @@ def execute_pipeline(command):
             index == len(commands) - 1
         )
 
-        # =====================
-        # BUILTIN COMMAND
-        # =====================
         if program in BUILTINS:
-
-            input_data = ""
 
             if previous_stdout is not None:
 
-                input_data = (
-                    previous_stdout.read()
-                )
+                previous_stdout.read()
 
                 previous_stdout.close()
 
@@ -528,9 +540,6 @@ def execute_pipeline(command):
 
             continue
 
-        # =====================
-        # EXTERNAL COMMAND
-        # =====================
         process = subprocess.Popen(
             [program] + args,
             stdin=previous_stdout,
@@ -684,9 +693,8 @@ def main():
         if not command.strip():
             continue
 
-        # =====================
-        # MULTI PIPELINE SUPPORT
-        # =====================
+        COMMAND_HISTORY.append(command)
+
         if "|" in command:
 
             execute_pipeline(command)
@@ -709,9 +717,6 @@ def main():
 
         actual_args = clean_args(args)
 
-        # =====================
-        # EXIT
-        # =====================
         if program == "exit":
 
             if actual_args and actual_args[0] == "0":
@@ -719,9 +724,6 @@ def main():
 
             break
 
-        # =====================
-        # ECHO
-        # =====================
         elif program == "echo":
 
             output = builtin_output(
@@ -734,9 +736,6 @@ def main():
                 redirect
             )
 
-        # =====================
-        # PWD
-        # =====================
         elif program == "pwd":
 
             output = builtin_output(
@@ -749,9 +748,18 @@ def main():
                 redirect
             )
 
-        # =====================
-        # CD
-        # =====================
+        elif program == "history":
+
+            output = builtin_output(
+                program,
+                actual_args
+            )
+
+            write_output(
+                output,
+                redirect
+            )
+
         elif program == "cd":
 
             if not actual_args:
@@ -774,9 +782,6 @@ def main():
                     "No such file or directory\n"
                 )
 
-        # =====================
-        # JOBS
-        # =====================
         elif program == "jobs":
 
             output = ""
@@ -835,9 +840,6 @@ def main():
                 redirect
             )
 
-        # =====================
-        # COMPLETE BUILTIN
-        # =====================
         elif program == "complete":
 
             if (
@@ -895,9 +897,6 @@ def main():
 
             write_output(output, redirect)
 
-        # =====================
-        # TYPE
-        # =====================
         elif program == "type":
 
             output = builtin_output(
@@ -910,9 +909,6 @@ def main():
                 redirect
             )
 
-        # =====================
-        # EXTERNAL COMMAND
-        # =====================
         else:
             execute_external(program, args)
 
