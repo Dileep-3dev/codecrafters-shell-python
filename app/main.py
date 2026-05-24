@@ -48,6 +48,36 @@ def ensure_parent_directory(filepath):
         os.makedirs(directory, exist_ok=True)
 
 
+# =========================
+# SAVE HISTORY TO HISTFILE
+# =========================
+def save_history_to_histfile():
+
+    histfile = os.environ.get(
+        "HISTFILE"
+    )
+
+    if not histfile:
+        return
+
+    try:
+
+        ensure_parent_directory(
+            histfile
+        )
+
+        with open(histfile, "w") as file:
+
+            for command in COMMAND_HISTORY:
+
+                file.write(
+                    command + "\n"
+                )
+
+    except:
+        pass
+
+
 def parse_redirect(args):
 
     for i, arg in enumerate(args):
@@ -763,6 +793,9 @@ def main():
             command = input("$ ")
 
         except EOFError:
+
+            save_history_to_histfile()
+
             break
 
         except KeyboardInterrupt:
@@ -797,6 +830,8 @@ def main():
         actual_args = clean_args(args)
 
         if program == "exit":
+
+            save_history_to_histfile()
 
             if actual_args and actual_args[0] == "0":
                 sys.exit(0)
