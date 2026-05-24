@@ -16,6 +16,7 @@ BUILTINS = [
     "complete",
     "jobs",
     "history",
+    "declare"
 ]
 
 COMPLETION_SCRIPT_REGISTRY = {}
@@ -1115,7 +1116,14 @@ def main():
                 output,
                 redirect
             )
+        elif program == "declare":
 
+            output = ""
+
+            write_output(
+                output,
+                redirect
+            )
         else:
             execute_external(program, args)
 
