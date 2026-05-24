@@ -360,9 +360,37 @@ def execute_external(program, args):
         )
         return
 
+    # =========================
+    # BACKGROUND JOB
+    # =========================
+    background = False
+
+    if args and args[-1] == "&":
+
+        background = True
+
+        args = args[:-1]
+
     redirect = parse_redirect(args)
 
-    # no redirect
+    # =========================
+    # BACKGROUND EXECUTION
+    # =========================
+    if background:
+
+        process = subprocess.Popen(
+            [program] + args
+        )
+
+        print(
+            f"[1] {process.pid}"
+        )
+
+        return
+
+    # =========================
+    # FOREGROUND EXECUTION
+    # =========================
     if redirect is None:
 
         subprocess.run([program] + args)
