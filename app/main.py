@@ -414,6 +414,34 @@ def write_output(output, redirect):
 
 
 # =========================
+# PIPELINE EXECUTION
+# =========================
+def execute_pipeline(left_command, right_command):
+
+    left_parts = shlex.split(
+        left_command.strip()
+    )
+
+    right_parts = shlex.split(
+        right_command.strip()
+    )
+
+    left_process = subprocess.Popen(
+        left_parts,
+        stdout=subprocess.PIPE,
+    )
+
+    right_process = subprocess.Popen(
+        right_parts,
+        stdin=left_process.stdout,
+    )
+
+    left_process.stdout.close()
+
+    right_process.wait()
+
+
+# =========================
 # EXTERNAL COMMANDS
 # =========================
 def execute_external(program, args):
@@ -548,6 +576,22 @@ def main():
             continue
 
         if not command.strip():
+            continue
+
+        # =====================
+        # PIPELINE SUPPORT
+        # =====================
+        if "|" in command:
+
+            left_command, right_command = (
+                command.split("|", 1)
+            )
+
+            execute_pipeline(
+                left_command,
+                right_command
+            )
+
             continue
 
         try:
