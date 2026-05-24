@@ -97,9 +97,6 @@ def run_completion_script(command):
         if len(words) >= 2:
             previous_word = words[-2]
 
-        # =========================
-        # COMP_LINE / COMP_POINT
-        # =========================
         env = os.environ.copy()
 
         env["COMP_LINE"] = line
@@ -154,7 +151,6 @@ def run_completion_script(command):
                         mask
                     )
 
-            # drain remaining output
             while True:
 
                 output = process.stdout.readline()
@@ -225,7 +221,6 @@ def complete(text, state):
             if cmd.startswith(text)
         ])
 
-        # auto append space on single command completion
         if len(matches) == 1:
 
             match = matches[0]
@@ -240,7 +235,6 @@ def complete(text, state):
     # -------------------------
     else:
 
-        # programmable completion
         if (
             len(words) >= 1
             and words[0] in COMPLETION_SCRIPT_REGISTRY
@@ -366,9 +360,6 @@ def execute_external(program, args):
         )
         return
 
-    # =========================
-    # BACKGROUND JOB
-    # =========================
     background = False
 
     if args and args[-1] == "&":
@@ -391,8 +382,14 @@ def execute_external(program, args):
         job = {
             "job_number": NEXT_JOB_NUMBER,
             "pid": process.pid,
-            "command": f"{program} {' '.join(args)} &",
+            "command_running": (
+                f"{program} {' '.join(args)} &"
+            ),
+            "command_done": (
+                f"{program} {' '.join(args)}"
+            ),
             "status": "Running",
+            "process": process,
         }
 
         BACKGROUND_JOBS.append(job)
@@ -561,6 +558,8 @@ def main():
                 BACKGROUND_JOBS
             )
 
+            jobs_to_remove = []
+
             for index, job in enumerate(
                 BACKGROUND_JOBS
             ):
@@ -573,12 +572,36 @@ def main():
                 elif index == total_jobs - 2:
                     marker = "-"
 
+                process = job["process"]
+
+                if process.poll() is None:
+
+                    status = "Running"
+
+                    command_text = (
+                        job["command_running"]
+                    )
+
+                else:
+
+                    status = "Done"
+
+                    command_text = (
+                        job["command_done"]
+                    )
+
+                    jobs_to_remove.append(job)
+
                 output += (
                     f"[{job['job_number']}]"
                     f"{marker}  "
-                    f"{job['status']:<24}"
-                    f"{job['command']}\n"
+                    f"{status:<24}"
+                    f"{command_text}\n"
                 )
+
+            for job in jobs_to_remove:
+
+                BACKGROUND_JOBS.remove(job)
 
             write_output(
                 output,
