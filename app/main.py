@@ -64,6 +64,48 @@ def is_valid_identifier(name):
 
 
 # =========================
+# PARAMETER EXPANSION
+# =========================
+def expand_variables_in_token(token):
+
+    def replace_variable(match):
+
+        variable_name = match.group(1)
+
+        if variable_name in SHELL_VARIABLES:
+
+            return SHELL_VARIABLES[
+                variable_name
+            ]
+
+        return os.environ.get(
+            variable_name,
+            ""
+        )
+
+    return re.sub(
+        r"\$([A-Za-z_][A-Za-z0-9_]*)",
+        replace_variable,
+        token
+    )
+
+
+def expand_variables(parts):
+
+    expanded_parts = []
+
+    for part in parts:
+
+        expanded_parts.append(
+            expand_variables_in_token(
+                part
+            )
+        )
+
+    return expanded_parts
+
+
+# =========================
 # SAVE HISTORY TO HISTFILE
 # =========================
 def save_history_to_histfile():
@@ -635,6 +677,11 @@ def execute_pipeline(command):
         for cmd in command.split("|")
     ]
 
+    commands = [
+        expand_variables(parts)
+        for parts in commands
+    ]
+
     processes = []
 
     previous_stdout = None
@@ -882,6 +929,10 @@ def main():
 
             parts = shlex.split(command)
 
+            parts = expand_variables(
+                parts
+            )
+
         except ValueError:
             continue
 
@@ -1036,9 +1087,6 @@ def main():
 
         elif program == "declare":
 
-            # =====================
-            # declare -p NAME
-            # =====================
             if (
                 len(actual_args) == 2
                 and actual_args[0] == "-p"
@@ -1065,9 +1113,6 @@ def main():
                         "not found\n"
                     )
 
-            # =====================
-            # declare NAME=VALUE
-            # =====================
             elif (
                 len(actual_args) == 1
                 and "=" in actual_args[0]
