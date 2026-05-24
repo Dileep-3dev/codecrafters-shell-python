@@ -1153,10 +1153,9 @@ def main():
                 if not is_valid_identifier(
                     variable
                 ):
-
                     output = (
                         f"declare: "
-                        f"`{actual_args[0]}`: "
+                        f"`{actual_args[0]}': "
                         "not a valid identifier\n"
                     )
 
