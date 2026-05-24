@@ -149,6 +149,9 @@ def builtin_output(program, args):
 
     actual_args = clean_args(args)
 
+    # =====================
+    # ECHO
+    # =====================
     if program == "echo":
 
         return (
@@ -156,6 +159,9 @@ def builtin_output(program, args):
             + "\n"
         )
 
+    # =====================
+    # PWD
+    # =====================
     elif program == "pwd":
 
         return (
@@ -163,6 +169,9 @@ def builtin_output(program, args):
             + "\n"
         )
 
+    # =====================
+    # TYPE
+    # =====================
     elif program == "type":
 
         if not actual_args:
@@ -188,13 +197,42 @@ def builtin_output(program, args):
             f"{cmd}: not found\n"
         )
 
+    # =====================
+    # HISTORY
+    # =====================
     elif program == "history":
+
+        history_entries = COMMAND_HISTORY
+
+        if actual_args:
+
+            try:
+
+                count = int(actual_args[0])
+
+                history_entries = (
+                    COMMAND_HISTORY[-count:]
+                )
+
+                start_index = (
+                    len(COMMAND_HISTORY)
+                    - len(history_entries)
+                    + 1
+                )
+
+            except:
+
+                start_index = 1
+
+        else:
+
+            start_index = 1
 
         output = ""
 
         for index, command in enumerate(
-            COMMAND_HISTORY,
-            start=1
+            history_entries,
+            start=start_index
         ):
 
             output += (
