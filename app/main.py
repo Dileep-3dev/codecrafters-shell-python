@@ -75,6 +75,42 @@ def clean_args(args):
 
 
 # =========================
+# LOAD HISTORY FROM HISTFILE
+# =========================
+def load_history_from_histfile():
+
+    global LAST_HISTORY_APPEND_INDEX
+
+    histfile = os.environ.get(
+        "HISTFILE"
+    )
+
+    if not histfile:
+        return
+
+    try:
+
+        with open(histfile, "r") as file:
+
+            for line in file:
+
+                line = line.rstrip("\n")
+
+                if line.strip():
+
+                    COMMAND_HISTORY.append(
+                        line
+                    )
+
+        LAST_HISTORY_APPEND_INDEX = len(
+            COMMAND_HISTORY
+        )
+
+    except:
+        pass
+
+
+# =========================
 # GET NEXT JOB NUMBER
 # =========================
 def get_next_job_number():
@@ -151,9 +187,6 @@ def builtin_output(program, args):
 
     actual_args = clean_args(args)
 
-    # =====================
-    # ECHO
-    # =====================
     if program == "echo":
 
         return (
@@ -161,9 +194,6 @@ def builtin_output(program, args):
             + "\n"
         )
 
-    # =====================
-    # PWD
-    # =====================
     elif program == "pwd":
 
         return (
@@ -171,9 +201,6 @@ def builtin_output(program, args):
             + "\n"
         )
 
-    # =====================
-    # TYPE
-    # =====================
     elif program == "type":
 
         if not actual_args:
@@ -199,9 +226,6 @@ def builtin_output(program, args):
             f"{cmd}: not found\n"
         )
 
-    # =====================
-    # HISTORY
-    # =====================
     elif program == "history":
 
         history_entries = COMMAND_HISTORY
@@ -715,6 +739,8 @@ def main():
 
     global LAST_HISTORY_APPEND_INDEX
 
+    load_history_from_histfile()
+
     readline.set_completer(complete)
 
     readline.set_completer_delims(
@@ -803,9 +829,6 @@ def main():
 
         elif program == "history":
 
-            # =====================
-            # history -r <file>
-            # =====================
             if (
                 len(actual_args) == 2
                 and actual_args[0] == "-r"
@@ -835,9 +858,6 @@ def main():
 
                 output = ""
 
-            # =====================
-            # history -w <file>
-            # =====================
             elif (
                 len(actual_args) == 2
                 and actual_args[0] == "-w"
@@ -867,9 +887,6 @@ def main():
 
                 output = ""
 
-            # =====================
-            # history -a <file>
-            # =====================
             elif (
                 len(actual_args) == 2
                 and actual_args[0] == "-a"
