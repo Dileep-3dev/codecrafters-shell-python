@@ -206,7 +206,10 @@ def builtin_output(program, args):
 
         if (
             len(actual_args) >= 2
-            and actual_args[0] == "-r"
+            and (
+                actual_args[0] == "-r"
+                or actual_args[0] == "-w"
+            )
         ):
 
             return ""
@@ -821,6 +824,34 @@ def main():
                                 COMMAND_HISTORY.append(
                                     line
                                 )
+
+                except:
+                    pass
+
+                output = ""
+
+            # =====================
+            # history -w <file>
+            # =====================
+            elif (
+                len(actual_args) == 2
+                and actual_args[0] == "-w"
+            ):
+
+                filepath = actual_args[1]
+
+                try:
+
+                    with open(
+                        filepath,
+                        "w"
+                    ) as file:
+
+                        for entry in COMMAND_HISTORY:
+
+                            file.write(
+                                entry + "\n"
+                            )
 
                 except:
                     pass
