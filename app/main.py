@@ -521,6 +521,21 @@ def main():
 
                 output = ""
 
+            # complete -r cmd
+            elif (
+                len(actual_args) == 2
+                and actual_args[0] == "-r"
+            ):
+
+                cmd = actual_args[1]
+
+                COMPLETION_SCRIPT_REGISTRY.pop(
+                    cmd,
+                    None
+                )
+
+                output = ""
+
             # complete -p cmd
             elif (
                 len(actual_args) == 2
