@@ -626,6 +626,98 @@ def write_output(output, redirect):
 
 
 # =========================
+# MULTI PIPELINE EXECUTION
+# =========================
+def execute_pipeline(command):
+
+    commands = [
+        shlex.split(cmd.strip())
+        for cmd in command.split("|")
+    ]
+
+    processes = []
+
+    previous_stdout = None
+
+    for index, parts in enumerate(commands):
+
+        program = parts[0]
+
+        args = parts[1:]
+
+        is_last = (
+            index == len(commands) - 1
+        )
+
+        if program in BUILTINS:
+
+            if previous_stdout is not None:
+
+                previous_stdout.read()
+
+                previous_stdout.close()
+
+            output = builtin_output(
+                program,
+                args
+            )
+
+            if is_last:
+
+                sys.stdout.write(output)
+
+            else:
+
+                temp_process = subprocess.Popen(
+                    ["cat"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    text=True,
+                )
+
+                temp_process.stdin.write(
+                    output
+                )
+
+                temp_process.stdin.close()
+
+                previous_stdout = (
+                    temp_process.stdout
+                )
+
+                processes.append(
+                    temp_process
+                )
+
+            continue
+
+        process = subprocess.Popen(
+            [program] + args,
+            stdin=previous_stdout,
+            stdout=(
+                subprocess.PIPE
+                if not is_last
+                else None
+            ),
+            text=True,
+        )
+
+        if previous_stdout is not None:
+            previous_stdout.close()
+
+        if not is_last:
+
+            previous_stdout = (
+                process.stdout
+            )
+
+        processes.append(process)
+
+    for process in processes:
+        process.wait()
+
+
+# =========================
 # EXTERNAL COMMANDS
 # =========================
 def execute_external(program, args):
@@ -640,15 +732,102 @@ def execute_external(program, args):
 
         return
 
-    subprocess.run(
-        [program] + args
-    )
+    background = False
+
+    if args and args[-1] == "&":
+
+        background = True
+
+        args = args[:-1]
+
+    redirect = parse_redirect(args)
+
+    if background:
+
+        process = subprocess.Popen(
+            [program] + args
+        )
+
+        job_number = get_next_job_number()
+
+        job = {
+            "job_number": job_number,
+            "pid": process.pid,
+            "command_running": (
+                f"{program} {' '.join(args)} &"
+            ),
+            "command_done": (
+                f"{program} {' '.join(args)}"
+            ),
+            "process": process,
+        }
+
+        BACKGROUND_JOBS.append(job)
+
+        BACKGROUND_JOBS.sort(
+            key=lambda job: job["job_number"]
+        )
+
+        print(
+            f"[{job_number}] {process.pid}"
+        )
+
+        return
+
+    if redirect is None:
+
+        subprocess.run(
+            [program] + args
+        )
+
+        return
+
+    stream, mode, index, filepath = redirect
+
+    ensure_parent_directory(filepath)
+
+    stdout_target = None
+
+    stderr_target = None
+
+    try:
+
+        if stream == "stdout":
+
+            stdout_target = open(
+                filepath,
+                mode
+            )
+
+        else:
+
+            stderr_target = open(
+                filepath,
+                mode
+            )
+
+        subprocess.run(
+            [program] + args[:index],
+            stdout=stdout_target,
+            stderr=stderr_target,
+            text=True
+        )
+
+    finally:
+
+        if stdout_target:
+            stdout_target.close()
+
+        if stderr_target:
+            stderr_target.close()
 
 
 # =========================
 # MAIN
 # =========================
 def main():
+
+    global LAST_HISTORY_APPEND_INDEX
 
     load_history_from_histfile()
 
@@ -693,6 +872,12 @@ def main():
 
         COMMAND_HISTORY.append(command)
 
+        if "|" in command:
+
+            execute_pipeline(command)
+
+            continue
+
         try:
 
             parts = shlex.split(command)
@@ -711,9 +896,6 @@ def main():
 
         actual_args = clean_args(args)
 
-        # =====================
-        # EXIT
-        # =====================
         if program == "exit":
 
             save_history_to_histfile()
@@ -723,9 +905,6 @@ def main():
 
             break
 
-        # =====================
-        # ECHO
-        # =====================
         elif program == "echo":
 
             output = builtin_output(
@@ -738,9 +917,6 @@ def main():
                 redirect
             )
 
-        # =====================
-        # PWD
-        # =====================
         elif program == "pwd":
 
             output = builtin_output(
@@ -753,12 +929,116 @@ def main():
                 redirect
             )
 
-        # =====================
-        # DECLARE
-        # =====================
+        elif program == "history":
+
+            if (
+                len(actual_args) == 2
+                and actual_args[0] == "-r"
+            ):
+
+                filepath = actual_args[1]
+
+                try:
+
+                    with open(
+                        filepath,
+                        "r"
+                    ) as file:
+
+                        for line in file:
+
+                            line = line.rstrip("\n")
+
+                            if line.strip():
+
+                                COMMAND_HISTORY.append(
+                                    line
+                                )
+
+                except:
+                    pass
+
+                output = ""
+
+            elif (
+                len(actual_args) == 2
+                and actual_args[0] == "-w"
+            ):
+
+                filepath = actual_args[1]
+
+                try:
+
+                    with open(
+                        filepath,
+                        "w"
+                    ) as file:
+
+                        for entry in COMMAND_HISTORY:
+
+                            file.write(
+                                entry + "\n"
+                            )
+
+                    LAST_HISTORY_APPEND_INDEX = len(
+                        COMMAND_HISTORY
+                    )
+
+                except:
+                    pass
+
+                output = ""
+
+            elif (
+                len(actual_args) == 2
+                and actual_args[0] == "-a"
+            ):
+
+                filepath = actual_args[1]
+
+                try:
+
+                    with open(
+                        filepath,
+                        "a"
+                    ) as file:
+
+                        new_entries = COMMAND_HISTORY[
+                            LAST_HISTORY_APPEND_INDEX:
+                        ]
+
+                        for entry in new_entries:
+
+                            file.write(
+                                entry + "\n"
+                            )
+
+                    LAST_HISTORY_APPEND_INDEX = len(
+                        COMMAND_HISTORY
+                    )
+
+                except:
+                    pass
+
+                output = ""
+
+            else:
+
+                output = builtin_output(
+                    program,
+                    actual_args
+                )
+
+            write_output(
+                output,
+                redirect
+            )
+
         elif program == "declare":
 
+            # =====================
             # declare -p NAME
+            # =====================
             if (
                 len(actual_args) == 2
                 and actual_args[0] == "-p"
@@ -785,7 +1065,9 @@ def main():
                         "not found\n"
                     )
 
+            # =====================
             # declare NAME=VALUE
+            # =====================
             elif (
                 len(actual_args) == 1
                 and "=" in actual_args[0]
@@ -825,9 +1107,6 @@ def main():
                 redirect
             )
 
-        # =====================
-        # CD
-        # =====================
         elif program == "cd":
 
             if not actual_args:
@@ -853,9 +1132,126 @@ def main():
                     "No such file or directory\n"
                 )
 
-        # =====================
-        # TYPE
-        # =====================
+        elif program == "jobs":
+
+            output = ""
+
+            total_jobs = len(
+                BACKGROUND_JOBS
+            )
+
+            jobs_to_remove = []
+
+            for index, job in enumerate(
+                BACKGROUND_JOBS
+            ):
+
+                marker = " "
+
+                if index == total_jobs - 1:
+
+                    marker = "+"
+
+                elif index == total_jobs - 2:
+
+                    marker = "-"
+
+                process = job["process"]
+
+                if process.poll() is None:
+
+                    status = "Running"
+
+                    command_text = (
+                        job["command_running"]
+                    )
+
+                else:
+
+                    status = "Done"
+
+                    command_text = (
+                        job["command_done"]
+                    )
+
+                    jobs_to_remove.append(job)
+
+                output += (
+                    f"[{job['job_number']}]"
+                    f"{marker}  "
+                    f"{status:<24}"
+                    f"{command_text}\n"
+                )
+
+            for job in jobs_to_remove:
+
+                BACKGROUND_JOBS.remove(job)
+
+            write_output(
+                output,
+                redirect
+            )
+
+        elif program == "complete":
+
+            if (
+                len(actual_args) == 3
+                and actual_args[0] == "-C"
+            ):
+
+                COMPLETION_SCRIPT_REGISTRY[
+                    actual_args[2]
+                ] = actual_args[1]
+
+                output = ""
+
+            elif (
+                len(actual_args) == 2
+                and actual_args[0] == "-r"
+            ):
+
+                cmd = actual_args[1]
+
+                COMPLETION_SCRIPT_REGISTRY.pop(
+                    cmd,
+                    None
+                )
+
+                output = ""
+
+            elif (
+                len(actual_args) == 2
+                and actual_args[0] == "-p"
+            ):
+
+                cmd = actual_args[1]
+
+                if cmd in COMPLETION_SCRIPT_REGISTRY:
+
+                    output = (
+                        f"complete -C "
+                        f"'{COMPLETION_SCRIPT_REGISTRY[cmd]}' "
+                        f"{cmd}\n"
+                    )
+
+                else:
+
+                    output = (
+                        f"complete: {cmd}: "
+                        "no completion specification\n"
+                    )
+
+            else:
+
+                output = (
+                    "complete is a shell builtin\n"
+                )
+
+            write_output(
+                output,
+                redirect
+            )
+
         elif program == "type":
 
             output = builtin_output(
@@ -868,9 +1264,6 @@ def main():
                 redirect
             )
 
-        # =====================
-        # EXTERNAL COMMAND
-        # =====================
         else:
 
             execute_external(
