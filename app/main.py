@@ -92,6 +92,17 @@ def run_completion_script(command):
         if len(words) >= 2:
             previous_word = words[-2]
 
+        # =========================
+        # COMP_LINE / COMP_POINT
+        # =========================
+        env = os.environ.copy()
+
+        env["COMP_LINE"] = line
+
+        env["COMP_POINT"] = str(
+            len(line.encode())
+        )
+
         process = subprocess.Popen(
             [
                 script,
@@ -103,6 +114,7 @@ def run_completion_script(command):
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             universal_newlines=True,
+            env=env,
         )
 
         matches = []
