@@ -33,6 +33,33 @@ def locate_in_path(command):
     return shutil.which(command)
 
 
+def run_completion_script(command_name):
+
+    completer = COMPLETION_SCRIPT_REGISTRY.get(command_name)
+
+    if not completer:
+        return ""
+
+    try:
+
+        result = subprocess.run(
+            [completer],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+
+        lines = result.stdout.splitlines()
+
+        if lines:
+            return lines[0]
+
+    except:
+        pass
+
+    return ""
+
+
 # autocomplete
 def complete(text, state):
 
@@ -47,11 +74,13 @@ def complete(text, state):
 
     buffer = readline.get_line_buffer()
 
+    tokens = buffer.split()
+
     completing_command = (
         not buffer.strip()
         or (
             not buffer.endswith(" ")
-            and len(buffer.split()) == 1
+            and len(tokens) == 1
         )
     )
 
@@ -68,6 +97,7 @@ def complete(text, state):
                 continue
 
             try:
+
                 for entry in os.listdir(directory):
 
                     full_path = os.path.join(directory, entry)
@@ -86,6 +116,18 @@ def complete(text, state):
 
             if cmd.startswith(text):
                 matches.append(cmd + " ")
+
+    # programmable completion
+    elif text == "":
+
+        if len(tokens) == 1:
+
+            command_name = tokens[0]
+
+            completion = run_completion_script(command_name)
+
+            if completion:
+                matches.append(completion + " ")
 
     # filepath completion
     else:
@@ -148,7 +190,7 @@ def parse_redirect(args):
 
         if arg in REDIRECT_OPS and i + 1 < len(args):
 
-            stream, mode, = REDIRECT_OPS[arg]
+            stream, mode = REDIRECT_OPS[arg]
 
             return stream, mode, i, args[i + 1]
 
@@ -415,7 +457,7 @@ def main():
 
             write_output(output, redirect)
 
-        # external
+        # external commands
         else:
             execute_external(program, args)
 
