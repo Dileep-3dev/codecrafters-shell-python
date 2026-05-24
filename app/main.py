@@ -53,7 +53,7 @@ def ensure_parent_directory(filepath):
 
 
 # =========================
-# VALIDATE VARIABLE NAME
+# VALID IDENTIFIER
 # =========================
 def is_valid_identifier(name):
 
@@ -68,9 +68,7 @@ def is_valid_identifier(name):
 # =========================
 def expand_variables_in_token(token):
 
-    # -------------------------
-    # ${VAR} expansion
-    # -------------------------
+    # ${VAR}
     def replace_brace_variable(match):
 
         variable_name = match.group(1)
@@ -92,9 +90,7 @@ def expand_variables_in_token(token):
         token
     )
 
-    # -------------------------
-    # $VAR expansion
-    # -------------------------
+    # $VAR
     def replace_variable(match):
 
         variable_name = match.group(1)
@@ -118,19 +114,25 @@ def expand_variables_in_token(token):
 
     return token
 
-def expand_variables(parts):
 
-    expanded_parts = []
+# =========================
+# EXPAND VARIABLES
+# =========================
+def expand_variables(args):
 
-    for part in parts:
+    expanded_args = []
 
-        expanded_parts.append(
-            expand_variables_in_token(
-                part
-            )
-        )
+    for arg in args:
 
-    return expanded_parts
+        expanded = expand_variables_in_token(arg)
+
+        # remove empty arguments
+        if expanded == "":
+            continue
+
+        expanded_args.append(expanded)
+
+    return expanded_args
 
 
 # =========================
@@ -705,11 +707,6 @@ def execute_pipeline(command):
         for cmd in command.split("|")
     ]
 
-    commands = [
-        expand_variables(parts)
-        for parts in commands
-    ]
-
     processes = []
 
     previous_stdout = None
@@ -718,7 +715,9 @@ def execute_pipeline(command):
 
         program = parts[0]
 
-        args = parts[1:]
+        args = expand_variables(
+            parts[1:]
+        )
 
         is_last = (
             index == len(commands) - 1
@@ -957,10 +956,6 @@ def main():
 
             parts = shlex.split(command)
 
-            parts = expand_variables(
-                parts
-            )
-
         except ValueError:
             continue
 
@@ -969,7 +964,9 @@ def main():
 
         program = parts[0]
 
-        args = parts[1:]
+        args = expand_variables(
+            parts[1:]
+        )
 
         redirect = parse_redirect(args)
 
@@ -1159,7 +1156,7 @@ def main():
 
                     output = (
                         f"declare: "
-                        f"`{actual_args[0]}': "
+                        f"`{actual_args[0]}`: "
                         "not a valid identifier\n"
                     )
 
