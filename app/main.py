@@ -24,6 +24,8 @@ BACKGROUND_JOBS = []
 
 COMMAND_HISTORY = []
 
+LAST_HISTORY_APPEND_INDEX = 0
+
 REDIRECT_OPS = {
     ">": ("stdout", "w"),
     "1>": ("stdout", "w"),
@@ -209,6 +211,7 @@ def builtin_output(program, args):
             and (
                 actual_args[0] == "-r"
                 or actual_args[0] == "-w"
+                or actual_args[0] == "-a"
             )
         ):
 
@@ -710,6 +713,8 @@ def execute_external(program, args):
 # =========================
 def main():
 
+    global LAST_HISTORY_APPEND_INDEX
+
     readline.set_completer(complete)
 
     readline.set_completer_delims(
@@ -852,6 +857,46 @@ def main():
                             file.write(
                                 entry + "\n"
                             )
+
+                    LAST_HISTORY_APPEND_INDEX = len(
+                        COMMAND_HISTORY
+                    )
+
+                except:
+                    pass
+
+                output = ""
+
+            # =====================
+            # history -a <file>
+            # =====================
+            elif (
+                len(actual_args) == 2
+                and actual_args[0] == "-a"
+            ):
+
+                filepath = actual_args[1]
+
+                try:
+
+                    with open(
+                        filepath,
+                        "a"
+                    ) as file:
+
+                        new_entries = COMMAND_HISTORY[
+                            LAST_HISTORY_APPEND_INDEX:
+                        ]
+
+                        for entry in new_entries:
+
+                            file.write(
+                                entry + "\n"
+                            )
+
+                    LAST_HISTORY_APPEND_INDEX = len(
+                        COMMAND_HISTORY
+                    )
 
                 except:
                     pass
