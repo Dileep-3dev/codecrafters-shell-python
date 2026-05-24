@@ -5,7 +5,6 @@ import shutil
 import shlex
 import readline
 import selectors
-import io
 
 
 BUILTINS = [
@@ -147,9 +146,6 @@ def builtin_output(program, args):
 
     actual_args = clean_args(args)
 
-    # =====================
-    # ECHO
-    # =====================
     if program == "echo":
 
         return (
@@ -157,9 +153,6 @@ def builtin_output(program, args):
             + "\n"
         )
 
-    # =====================
-    # PWD
-    # =====================
     elif program == "pwd":
 
         return (
@@ -167,9 +160,6 @@ def builtin_output(program, args):
             + "\n"
         )
 
-    # =====================
-    # TYPE
-    # =====================
     elif program == "type":
 
         if not actual_args:
@@ -467,90 +457,103 @@ def write_output(output, redirect):
 
 
 # =========================
-# PIPELINE EXECUTION
+# MULTI PIPELINE EXECUTION
 # =========================
-def execute_pipeline(left_command, right_command):
+def execute_pipeline(command):
 
-    left_parts = shlex.split(
-        left_command.strip()
-    )
+    commands = [
+        shlex.split(cmd.strip())
+        for cmd in command.split("|")
+    ]
 
-    right_parts = shlex.split(
-        right_command.strip()
-    )
+    processes = []
 
-    left_program = left_parts[0]
-    left_args = left_parts[1:]
+    previous_stdout = None
 
-    right_program = right_parts[0]
-    right_args = right_parts[1:]
+    for index, parts in enumerate(commands):
 
-    # =====================
-    # LEFT SIDE
-    # =====================
-    if left_program in BUILTINS:
+        program = parts[0]
+        args = parts[1:]
 
-        left_output = builtin_output(
-            left_program,
-            left_args
+        is_last = (
+            index == len(commands) - 1
         )
 
-        left_process = subprocess.Popen(
-            right_parts,
-            stdin=subprocess.PIPE,
+        # =====================
+        # BUILTIN COMMAND
+        # =====================
+        if program in BUILTINS:
+
+            input_data = ""
+
+            if previous_stdout is not None:
+
+                input_data = (
+                    previous_stdout.read()
+                )
+
+                previous_stdout.close()
+
+            output = builtin_output(
+                program,
+                args
+            )
+
+            if is_last:
+
+                sys.stdout.write(output)
+
+            else:
+
+                temp_process = subprocess.Popen(
+                    ["cat"],
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    text=True,
+                )
+
+                temp_process.stdin.write(
+                    output
+                )
+
+                temp_process.stdin.close()
+
+                previous_stdout = (
+                    temp_process.stdout
+                )
+
+                processes.append(
+                    temp_process
+                )
+
+            continue
+
+        # =====================
+        # EXTERNAL COMMAND
+        # =====================
+        process = subprocess.Popen(
+            [program] + args,
+            stdin=previous_stdout,
+            stdout=(
+                subprocess.PIPE
+                if not is_last
+                else None
+            ),
             text=True,
         )
 
-        left_process.communicate(
-            left_output
-        )
+        if previous_stdout is not None:
+            previous_stdout.close()
 
-        return
+        if not is_last:
+            previous_stdout = (
+                process.stdout
+            )
 
-    # =====================
-    # RIGHT SIDE
-    # =====================
-    if right_program in BUILTINS:
+        processes.append(process)
 
-        left_process = subprocess.Popen(
-            left_parts,
-            stdout=subprocess.PIPE,
-            text=True,
-        )
-
-        left_output = (
-            left_process.stdout.read()
-        )
-
-        result = builtin_output(
-            right_program,
-            right_args
-        )
-
-        sys.stdout.write(result)
-
-        left_process.stdout.close()
-
-        left_process.wait()
-
-        return
-
-    # =====================
-    # NORMAL PIPELINE
-    # =====================
-    left_process = subprocess.Popen(
-        left_parts,
-        stdout=subprocess.PIPE,
-    )
-
-    right_process = subprocess.Popen(
-        right_parts,
-        stdin=left_process.stdout,
-    )
-
-    left_process.stdout.close()
-
-    right_process.wait()
+    for process in processes:
+        process.wait()
 
 
 # =========================
@@ -682,18 +685,11 @@ def main():
             continue
 
         # =====================
-        # PIPELINE SUPPORT
+        # MULTI PIPELINE SUPPORT
         # =====================
         if "|" in command:
 
-            left_command, right_command = (
-                command.split("|", 1)
-            )
-
-            execute_pipeline(
-                left_command,
-                right_command
-            )
+            execute_pipeline(command)
 
             continue
 
