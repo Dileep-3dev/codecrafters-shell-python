@@ -21,8 +21,6 @@ COMPLETION_SCRIPT_REGISTRY = {}
 
 BACKGROUND_JOBS = []
 
-NEXT_JOB_NUMBER = 1
-
 REDIRECT_OPS = {
     ">": ("stdout", "w"),
     "1>": ("stdout", "w"),
@@ -69,6 +67,26 @@ def clean_args(args):
         return args[:index]
 
     return args
+
+
+# =========================
+# GET NEXT JOB NUMBER
+# =========================
+def get_next_job_number():
+
+    used_numbers = set()
+
+    for job in BACKGROUND_JOBS:
+        used_numbers.add(
+            job["job_number"]
+        )
+
+    job_number = 1
+
+    while job_number in used_numbers:
+        job_number += 1
+
+    return job_number
 
 
 # =========================
@@ -400,8 +418,6 @@ def write_output(output, redirect):
 # =========================
 def execute_external(program, args):
 
-    global NEXT_JOB_NUMBER
-
     executable = locate_in_path(program)
 
     if not executable:
@@ -429,8 +445,10 @@ def execute_external(program, args):
             [program] + args
         )
 
+        job_number = get_next_job_number()
+
         job = {
-            "job_number": NEXT_JOB_NUMBER,
+            "job_number": job_number,
             "pid": process.pid,
             "command_running": (
                 f"{program} {' '.join(args)} &"
@@ -443,11 +461,13 @@ def execute_external(program, args):
 
         BACKGROUND_JOBS.append(job)
 
-        print(
-            f"[{NEXT_JOB_NUMBER}] {process.pid}"
+        BACKGROUND_JOBS.sort(
+            key=lambda job: job["job_number"]
         )
 
-        NEXT_JOB_NUMBER += 1
+        print(
+            f"[{job_number}] {process.pid}"
+        )
 
         return
 
