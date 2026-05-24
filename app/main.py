@@ -60,8 +60,89 @@ def run_completion_script(command_name):
     return ""
 
 
-# autocomplete
 def complete(text, state):
+
+    matches = []
+
+    line = readline.get_line_buffer()
+
+    words = line.split()
+
+    # first token -> command completion
+    if len(words) <= 1 and not line.endswith(" "):
+
+        commands = set(builtins)
+
+        path_dirs = os.environ.get("PATH", "").split(os.pathsep)
+
+        for directory in path_dirs:
+
+            if not os.path.isdir(directory):
+                continue
+
+            try:
+
+                for entry in os.listdir(directory):
+
+                    full_path = os.path.join(directory, entry)
+
+                    if (
+                        os.path.isfile(full_path)
+                        and os.access(full_path, os.X_OK)
+                    ):
+                        commands.add(entry)
+
+            except:
+                pass
+
+        matches = sorted(
+            [cmd for cmd in commands if cmd.startswith(text)]
+        )
+
+        # single command match -> add space
+        if len(matches) == 1:
+            matches[0] += " "
+
+    # everything after first command -> filepath completion
+    else:
+
+        if "/" in text:
+
+            directory, prefix = os.path.split(text)
+
+            if directory == "":
+                directory = "."
+
+        else:
+
+            directory = "."
+            prefix = text
+
+        try:
+
+            for entry in os.listdir(directory):
+
+                if entry.startswith(prefix):
+
+                    full_path = os.path.join(directory, entry)
+
+                    if full_path.startswith("./"):
+                        full_path = full_path[2:]
+
+                    if os.path.isdir(full_path):
+                        matches.append(full_path + "/")
+                    else:
+                        matches.append(full_path + " ")
+
+        except FileNotFoundError:
+            pass
+
+        matches = sorted(matches)
+
+    if state < len(matches):
+        return matches[state]
+
+    return None
 
     matches = []
 
