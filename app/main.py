@@ -4,7 +4,15 @@ import re
 import subprocess
 import shutil
 import shlex
-import readline
+try:
+    import readline
+except ImportError:  # readline is Unix-only; Windows needs pyreadline3
+    try:
+        import pyreadline3 as readline  # type: ignore
+    except ImportError:
+        # Without it the shell still runs; line editing, history recall
+        # and tab completion are simply unavailable.
+        readline = None
 import selectors
 
 
@@ -434,7 +442,7 @@ def run_completion_script(command):
 
     try:
 
-        line = readline.get_line_buffer()
+        line = (readline.get_line_buffer() if readline else "")
 
         words = line.split()
 
@@ -526,7 +534,7 @@ def run_completion_script(command):
 # =========================
 def complete(text, state):
 
-    line = readline.get_line_buffer()
+    line = (readline.get_line_buffer() if readline else "")
 
     words = line.split()
 
@@ -662,7 +670,7 @@ def display_matches(
     print("  ".join(sorted(matches)))
 
     sys.stdout.write(
-        "$ " + readline.get_line_buffer()
+        "$ " + (readline.get_line_buffer() if readline else "")
     )
 
     sys.stdout.flush()
@@ -905,21 +913,28 @@ def main():
 
     load_history_from_histfile()
 
-    readline.set_completer(
-        complete
-    )
+    if readline is not None:
+        readline.set_completer(
+            complete
+        )
 
-    readline.set_completer_delims(
-        " \t\n"
-    )
+        readline.set_completer_delims(
+            " \t\n"
+        )
 
-    readline.parse_and_bind(
-        "tab: complete"
-    )
+        readline.parse_and_bind(
+            "tab: complete"
+        )
 
-    readline.set_completion_display_matches_hook(
-        display_matches
-    )
+        readline.set_completion_display_matches_hook(
+            display_matches
+        )
+    else:
+        print(
+            "note: readline is unavailable, so tab completion and history "
+            "recall are off. On Windows: pip install pyreadline3",
+            file=sys.stderr,
+        )
 
     while True:
 
